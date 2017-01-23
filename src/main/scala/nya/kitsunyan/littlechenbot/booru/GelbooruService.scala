@@ -5,7 +5,7 @@ object GelbooruService extends BooruService {
 
   override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
 
-  override def parseHtml(html: String): Option[String] = {
+  override def parseHtml(html: String): Option[(String, Set[String], Set[String])] = {
     "(?s)<!\\[CDATA\\[.*?(.*?)\\};.*?//\\]\\]>".r.findFirstMatchIn(html) match {
       case Some(m) =>
         val map = (for {
@@ -14,8 +14,12 @@ object GelbooruService extends BooruService {
           if (values.head != null) (key, values.head) else (key, values.last)
         }.toMap
         try {
-          Some(map("domain") + "/" + map("base_dir") + "/"
-            + map("dir") + "/" + map("img"))
+          val url = map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")
+          val characters = "<li class=\"tag-type-character\"><a .*?page=post.*?>(.*?)</a>".r
+            .findAllIn(html).matchData.map(matchData => matchData.subgroups.head).toSet
+          val artists = "<li class=\"tag-type-artist\"><a .*?page=post.*?>(.*?)</a>".r
+            .findAllIn(html).matchData.map(matchData => matchData.subgroups.head).toSet
+          Some(url, characters, artists)
         } catch {
           case _: NoSuchElementException => None
         }

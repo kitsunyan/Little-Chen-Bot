@@ -86,33 +86,33 @@ object BotApplication extends App {
                           try {
                             (for {
                               booruService <- booruServices
-                              (filterResult, success, data) = if (booruService.filterUrl(url)) {
+                              (filterResult, success, data, characters, artists) = if (booruService.filterUrl(url)) {
                                 val response = http(url, proxy = true).asString
                                 if (response.code == 200) {
                                   booruService.parseHtml(response.body) match {
-                                    case Some(url) => (true, true, url)
-                                    case None => (true, false, s"Not parsed: $url.")
+                                    case Some((url, characters, artists)) => (true, true, url, characters, artists)
+                                    case None => (true, false, s"Not parsed: $url.", null, null)
                                   }
                                 } else {
                                   val code = response.code
                                   throw new Exception(s"Invalid response: $code.")
                                 }
                               } else {
-                                (false, false, null)
+                                (false, false, null, null, null)
                               }
                               if filterResult
-                            } yield success -> data) match {
-                              case List((success, data)) => (success, data)
-                              case _ => (false, "Unknown service.")
+                            } yield (success, data, url, characters, artists)) match {
+                              case List(result) => result
+                              case _ => (false, "Unknown service.", null, null, null)
                             }
                           } catch {
                             case e: Exception =>
                               e.printStackTrace()
-                              (false, "An exception was thrown during image request.")
+                              (false, "An exception was thrown during image request.", null, null, null)
                           }
-                        case _ => (false, "No images found.")
+                        case _ => (false, "No images found.", null, null, null)
                       }
-                    }.flatMap { case (success, data) =>
+                    }.flatMap { case (success, data, url, characters, artists) =>
                       if (success) {
                         Future {
                           try {
@@ -139,8 +139,13 @@ object BotApplication extends App {
                               val index = text.indexOf('?')
                               if (index >= 0) text.substring(0, index) else text
                             }.get
+                            def appendIterable(title: String, list: Iterable[String])(s: String): String = {
+                              if (list.nonEmpty) s + s"\n$title: " + list.reduceLeft(_ + ", " + _) else s
+                            }
+                            val captionOption = Some(url).map(appendIterable("Characters", characters))
+                              .map(appendIterable("Artists", artists))
                             request(SendDocument(Left(message.sender), Left(InputFile(name, bytes)),
-                              replyToMessageId = Some(message.messageId)))
+                              replyToMessageId = Some(message.messageId), caption = captionOption))
                           } else {
                             replyQuote(data)
                           }
