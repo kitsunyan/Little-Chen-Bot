@@ -1,7 +1,5 @@
 package nya.kitsunyan.littlechenbot
 
-import java.io.IOException
-
 import com.typesafe.config.ConfigFactory
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
@@ -27,8 +25,9 @@ object BotApplication extends App {
 
     override def filterChat(message: Message): Boolean = message.date >= startTime && chats.contains(message.chat.id)
 
-    on(command("iqdb")) { implicit message =>
+    private class BotException(message: String) extends Exception(message)
 
+    on(command("iqdb")) { implicit message =>
       def extractMessageWithImage(message: Message): Option[Message] = {
         message.caption match {
           case Some(_) => Some(message)
@@ -69,7 +68,7 @@ object BotApplication extends App {
                   if (path.endsWith(".webp")) Utils.webpToPng(array) else array
                 }.get, path)
               }
-            case None => throw new Exception("Unable to fetch Telegram file.")
+            case None => throw new BotException("Unable to fetch Telegram file.")
           }
         }
       }
@@ -100,48 +99,36 @@ object BotApplication extends App {
         image: Option[Array[Byte]] = None)
 
       def readBooruPage(pageUrl: String): ImageData = {
-        try {
-          (for {
-            booruService <- BooruService.list
-            imageData = if (booruService.filterUrl(pageUrl)) {
-              val response = http(pageUrl, proxy = true).asString
-              if (response.code == 200) {
-                booruService.parseHtml(response.body) match {
-                  case Some((url, characters, artists)) => Some(ImageData(url, pageUrl, characters, artists))
-                  case None => throw new Exception(s"Not parsed: $pageUrl.")
-                }
-              } else {
-                val code = response.code
-                throw new IOException(s"Invalid response: $code.")
+        (for {
+          booruService <- BooruService.list
+          imageData = if (booruService.filterUrl(pageUrl)) {
+            val response = http(pageUrl, proxy = true).asString
+            if (response.code == 200) {
+              booruService.parseHtml(response.body) match {
+                case Some((url, characters, artists)) => Some(ImageData(url, pageUrl, characters, artists))
+                case None => throw new BotException(s"Not parsed: $pageUrl.")
               }
             } else {
-              None
+              val code = response.code
+              throw new Exception(s"Invalid response: $code.")
             }
-            if imageData.nonEmpty
-          } yield imageData.get) match {
-            case List(result) => result
-            case _ => throw new Exception("Unknown service.")
+          } else {
+            None
           }
-        } catch {
-          case e: IOException =>
-            e.printStackTrace()
-            throw new Exception("An exception was thrown during image request.")
+          if imageData.nonEmpty
+        } yield imageData.get) match {
+          case List(result) => result
+          case _ => throw new BotException("Unknown service.")
         }
       }
 
       def readBooruImage(imageData: ImageData): ImageData = {
-        try {
-          val response = http(imageData.url, proxy = true).asBytes
-          if (response.code == 200) {
-            imageData.copy(image = Some(response.body))
-          } else {
-            val code = response.code
-            throw new IOException(s"Invalid response: $code.")
-          }
-        } catch {
-          case e: IOException =>
-            e.printStackTrace()
-            throw new Exception("An exception was thrown during image request.")
+        val response = http(imageData.url, proxy = true).asBytes
+        if (response.code == 200) {
+          imageData.copy(image = Some(response.body))
+        } else {
+          val code = response.code
+          throw new Exception(s"Invalid response: $code.")
         }
       }
 
@@ -170,16 +157,20 @@ object BotApplication extends App {
         extractMessageWithImage(message).flatMap(extractFileId) match {
           case Some(fileId) => fileId
           case None =>
-            throw new Exception("Please reply to message with image or send image with command in caption.\n" +
+            throw new BotException("Please reply to message with image or send image with command in caption.\n" +
               "Remember I can't see other bots' messages even when you reply them!")
         }
       }.flatMap(readTelegramFile).map { case (array, path) =>
         sendIqdbRequest(array, path, 70) match {
           case pageUrl :: _ => pageUrl
-          case _ => throw new Exception("No images found.")
+          case _ => throw new BotException("No images found.")
         }
-      }.map(readBooruPage).map(readBooruImage).flatMap(replyWithImage).recoverWith { case e: Exception =>
-        replyQuote(e.getMessage)
+      }.map(readBooruPage).map(readBooruImage).flatMap(replyWithImage).recoverWith {
+        case e: BotException =>
+          replyQuote(e.getMessage)
+        case e: Exception =>
+          e.printStackTrace()
+          replyQuote("An exception was thrown during image request.")
       }
     }
   }
