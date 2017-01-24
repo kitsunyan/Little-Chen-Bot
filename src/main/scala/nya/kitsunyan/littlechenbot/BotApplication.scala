@@ -16,6 +16,8 @@ object BotApplication extends App {
     private val chats = config.getLongList("bot.chats")
     private val startTime = System.currentTimeMillis / 1000
 
+    private implicit val botNickname = request(GetMe).map(_.username.getOrElse(""))
+
     private def http(url: String, proxy: Boolean = false): HttpRequest = {
       Some(Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 10000)
         .option(HttpOptions.followRedirects(true))).map { request =>

@@ -5,7 +5,8 @@ import info.mukel.telegrambot4s.methods.SendMessage
 import info.mukel.telegrambot4s.models.Message
 
 import scala.collection.mutable
-import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+import scala.concurrent._
 
 trait Commands extends BotBase {
   private val commands = mutable.Map[Message => Boolean, Message => Unit]()
@@ -21,7 +22,7 @@ trait Commands extends BotBase {
 
   def filterChat(message: Message): Boolean = true
 
-  def command(command: String)(message: Message): Boolean = {
+  def command(command: String)(message: Message)(implicit botNickname: Future[String]): Boolean = {
     if (filterChat(message)) {
       (message.text match {
         case Some(text) => Some(text)
@@ -32,11 +33,11 @@ trait Commands extends BotBase {
           }
       }) match {
         case Some(text) =>
-          val extended = "/" + command
-          text match {
-            case text if text == extended || text.startsWith(extended + "@") => true
-            case _ => false
-          }
+          val shortCommand = "/" + command
+          val longCommand = shortCommand + "@" + Await.result(botNickname, Duration.Inf)
+          Seq(shortCommand, longCommand).map { fullCommand =>
+            text.equals(fullCommand) || text.startsWith(fullCommand) && text.charAt(fullCommand.length) <= ' '
+          }.reduceLeft(_ || _)
         case None => false
       }
     } else {
