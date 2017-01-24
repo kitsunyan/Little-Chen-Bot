@@ -1,11 +1,11 @@
 package nya.kitsunyan.littlechenbot
 
+import java.io.IOException
+
 import com.typesafe.config.ConfigFactory
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
-import nya.kitsunyan.littlechenbot.booru._
-import nya.kitsunyan.littlechenbot.util.Utils
 
 import scala.concurrent.Future
 import scalaj.http._
@@ -27,139 +27,159 @@ object BotApplication extends App {
 
     override def filterChat(message: Message): Boolean = message.date >= startTime && chats.contains(message.chat.id)
 
-    private val booruServices = List(DanbooruService, GelbooruService)
-
     on(command("iqdb")) { implicit message =>
-      (message.caption match {
-        case Some(caption) => Some(message)
-        case None => message.replyToMessage
-      }) match {
-        case Some(replyToMessage) =>
-          Some(replyToMessage).flatMap { replyToMessage =>
-            replyToMessage.photo match {
-              case Some(photos) =>
-                Some(photos.reduceLeft { (photo1, photo2) =>
-                  if (photo2.fileSize.getOrElse(0) >= photo1.fileSize.getOrElse(0)) photo2 else photo1
-                }.fileId)
+
+      def extractMessageWithImage(message: Message): Option[Message] = {
+        message.caption match {
+          case Some(_) => Some(message)
+          case None => message.replyToMessage
+        }
+      }
+
+      def extractFileId(message: Message): Option[String] = {
+        message.photo match {
+          case Some(photos) =>
+            Some(photos.reduceLeft { (photo1, photo2) =>
+              // Find the largest image
+              if (photo2.fileSize.getOrElse(0) >= photo1.fileSize.getOrElse(0)) photo2 else photo1
+            }.fileId)
+          case None =>
+            message.sticker match {
+              case Some(sticker) => Some(sticker.fileId)
               case None =>
-                replyToMessage.sticker match {
-                  case Some(sticker) => Some(sticker.fileId)
-                  case None =>
-                    replyToMessage.document match {
-                      case Some(document) =>
-                        document.mimeType match {
-                          case Some(mimeType) if mimeType.startsWith("image/") => Some(document.fileId)
-                          case None => None
-                        }
+                message.document match {
+                  case Some(document) =>
+                    document.mimeType match {
+                      case Some(mimeType) if mimeType.startsWith("image/") => Some(document.fileId)
                       case None => None
                     }
+                  case None => None
                 }
             }
-          } match {
-            case Some(fileId) =>
-              request(GetFile(fileId)).flatMap { file =>
-                file.filePath match {
-                  case Some(path) =>
-                    Future {
-                      val array = Some(http(s"https://api.telegram.org/file/bot$token/$path").asBytes.body)
-                        .map { array =>
-                        if (path.endsWith(".webp")) Utils.webpToPng(array) else array
-                      }.get
-                      val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
-                      val response = http("https://iqdb.org/")
-                        .postMulti(MultiPart("file", "filename", mimeType, array))
-                        .params(booruServices.map("service[]" -> _.iqdbId)).asString
-                      val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
-                        "<td>(\\d+)% similarity</td>.*?</table>").r
-                      val linkPattern = "<a href=\"(.*?)\">".r
-                      (for {
-                        table <- tablePattern.findAllIn(response.body).matchData
-                        urls <- for {
-                          link <- linkPattern.findAllIn(table.group(0)).matchData
-                          url = (link.subgroups.head match {
-                            case s if s.startsWith("//") => "https:" + s
-                            case s => s
-                          }, table.group(1).toInt)
-                        } yield url
-                      } yield urls).toList.filter(_._2 >= 70).map(_._1) match {
-                        case url :: _ =>
-                          try {
-                            (for {
-                              booruService <- booruServices
-                              (filterResult, success, data, characters, artists) = if (booruService.filterUrl(url)) {
-                                val response = http(url, proxy = true).asString
-                                if (response.code == 200) {
-                                  booruService.parseHtml(response.body) match {
-                                    case Some((url, characters, artists)) => (true, true, url, characters, artists)
-                                    case None => (true, false, s"Not parsed: $url.", null, null)
-                                  }
-                                } else {
-                                  val code = response.code
-                                  throw new Exception(s"Invalid response: $code.")
-                                }
-                              } else {
-                                (false, false, null, null, null)
-                              }
-                              if filterResult
-                            } yield (success, data, url, characters, artists)) match {
-                              case List(result) => result
-                              case _ => (false, "Unknown service.", null, null, null)
-                            }
-                          } catch {
-                            case e: Exception =>
-                              e.printStackTrace()
-                              (false, "An exception was thrown during image request.", null, null, null)
-                          }
-                        case _ => (false, "No images found.", null, null, null)
-                      }
-                    }.flatMap { case (success, data, url, characters, artists) =>
-                      if (success) {
-                        Future {
-                          try {
-                            val response = http(data, proxy = true).asBytes
-                            if (response.code == 200) {
-                              (true, response.body, data)
-                            } else {
-                              val code = response.code
-                              throw new Exception(s"Invalid response: $code.")
-                            }
-                          } catch {
-                            case e: Exception =>
-                              e.printStackTrace()
-                              (false, null, "An exception was thrown during image request.")
-                          }
-                        }.flatMap { case (success, bytes, data) =>
-                          if (success) {
-                            val name = Some(data).map { text =>
-                              if (text == null || text == "") "image.jpeg" else text
-                            }.map { text =>
-                              val index = text.lastIndexOf('/')
-                              if (index >= 0) text.substring(index + 1) else text
-                            }.map { text =>
-                              val index = text.indexOf('?')
-                              if (index >= 0) text.substring(0, index) else text
-                            }.get
-                            def appendIterable(title: String, list: Iterable[String])(s: String): String = {
-                              if (list.nonEmpty) s + s"\n$title: " + list.reduceLeft(_ + ", " + _) else s
-                            }
-                            val captionOption = Some(url).map(appendIterable("Characters", characters))
-                              .map(appendIterable("Artists", artists))
-                            request(SendDocument(Left(message.sender), Left(InputFile(name, bytes)),
-                              replyToMessageId = Some(message.messageId), caption = captionOption))
-                          } else {
-                            replyQuote(data)
-                          }
-                        }
-                      } else {
-                        replyQuote(data)
-                      }
-                    }
-                  case None => Future { None }
-                }
+        }
+      }
+
+      def readTelegramFile(fileId: String): Future[(Array[Byte], String)] = {
+        request(GetFile(fileId)).flatMap { file =>
+          file.filePath match {
+            case Some(path) =>
+              Future {
+                val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
+                (Some(http(telegramImageUrl).asBytes.body).map { array =>
+                  if (path.endsWith(".webp")) Utils.webpToPng(array) else array
+                }.get, path)
               }
-            case _ => replyQuote("The message should contain an image.")
+            case None => throw new Exception("Unable to fetch Telegram file.")
           }
-        case None => replyQuote("Please reply to message with image.")
+        }
+      }
+
+      def sendIqdbRequest(array: Array[Byte], path: String, minSimilarity: Int): List[String] = {
+        val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
+        val response = http("https://iqdb.org/")
+          .postMulti(MultiPart("file", "filename", mimeType, array))
+          .params(BooruService.list.map("service[]" -> _.iqdbId)).asString
+
+        val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
+          "<td>(\\d+)% similarity</td>.*?</table>").r
+        val linkPattern = "<a href=\"(.*?)\">".r
+
+        (for {
+          table <- tablePattern.findAllIn(response.body).matchData
+          (url, similarity) <- for {
+            link <- linkPattern.findAllIn(table.group(0)).matchData
+            url = (link.subgroups.head match {
+              case s if s.startsWith("//") => "https:" + s
+              case s => s
+            }, table.group(1).toInt)
+          } yield url
+        } yield (url, similarity)).toList.filter(_._2 >= minSimilarity).map(_._1)
+      }
+
+      case class ImageData(url: String, pageUrl: String, characters: Set[String], artists: Set[String],
+        image: Option[Array[Byte]] = None)
+
+      def readBooruPage(pageUrl: String): ImageData = {
+        try {
+          (for {
+            booruService <- BooruService.list
+            imageData = if (booruService.filterUrl(pageUrl)) {
+              val response = http(pageUrl, proxy = true).asString
+              if (response.code == 200) {
+                booruService.parseHtml(response.body) match {
+                  case Some((url, characters, artists)) => Some(ImageData(url, pageUrl, characters, artists))
+                  case None => throw new Exception(s"Not parsed: $pageUrl.")
+                }
+              } else {
+                val code = response.code
+                throw new IOException(s"Invalid response: $code.")
+              }
+            } else {
+              None
+            }
+            if imageData.nonEmpty
+          } yield imageData.get) match {
+            case List(result) => result
+            case _ => throw new Exception("Unknown service.")
+          }
+        } catch {
+          case e: IOException =>
+            e.printStackTrace()
+            throw new Exception("An exception was thrown during image request.")
+        }
+      }
+
+      def readBooruImage(imageData: ImageData): ImageData = {
+        try {
+          val response = http(imageData.url, proxy = true).asBytes
+          if (response.code == 200) {
+            imageData.copy(image = Some(response.body))
+          } else {
+            val code = response.code
+            throw new IOException(s"Invalid response: $code.")
+          }
+        } catch {
+          case e: IOException =>
+            e.printStackTrace()
+            throw new Exception("An exception was thrown during image request.")
+        }
+      }
+
+      def replyWithImage(imageData: ImageData): Future[Message] = {
+        val name = Some(imageData.url).map { text =>
+          if (text == null || text == "") "image.jpeg" else text
+        }.map { text =>
+          val index = text.lastIndexOf('/')
+          if (index >= 0) text.substring(index + 1) else text
+        }.map { text =>
+          val index = text.indexOf('?')
+          if (index >= 0) text.substring(0, index) else text
+        }.get
+
+        def appendIterable(title: String, list: Iterable[String])(s: String): String = {
+          if (list.nonEmpty) s + s"\n$title: " + list.reduceLeft(_ + ", " + _) else s
+        }
+
+        val captionOption = Some(imageData.pageUrl).map(appendIterable("Characters", imageData.characters))
+          .map(appendIterable("Artists", imageData.artists))
+        request(SendDocument(Left(message.sender), Left(InputFile(name, imageData.image.get)),
+          replyToMessageId = Some(message.messageId), caption = captionOption))
+      }
+
+      Future {
+        extractMessageWithImage(message).flatMap(extractFileId) match {
+          case Some(fileId) => fileId
+          case None =>
+            throw new Exception("Please reply to message with image or send image with command in caption.\n" +
+              "Remember I can't see other bots' messages even when you reply them!")
+        }
+      }.flatMap(readTelegramFile).map { case (array, path) =>
+        sendIqdbRequest(array, path, 70) match {
+          case pageUrl :: _ => pageUrl
+          case _ => throw new Exception("No images found.")
+        }
+      }.map(readBooruPage).map(readBooruImage).flatMap(replyWithImage).recoverWith { case e: Exception =>
+        replyQuote(e.getMessage)
       }
     }
   }

@@ -1,4 +1,4 @@
-package nya.kitsunyan.littlechenbot.util
+package nya.kitsunyan.littlechenbot
 
 object Utils {
   def webpToPng(data: Array[Byte]): Array[Byte] = {
