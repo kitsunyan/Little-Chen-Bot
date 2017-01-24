@@ -1,28 +1,18 @@
-package nya.kitsunyan.littlechenbot
+package nya.kitsunyan.littlechenbot.command
 
-import info.mukel.telegrambot4s.api.BotBase
-import info.mukel.telegrambot4s.methods.SendMessage
-import info.mukel.telegrambot4s.models.Message
+import info.mukel.telegrambot4s.api._
+import info.mukel.telegrambot4s.methods._
+import info.mukel.telegrambot4s.models._
 
-import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent._
 
-trait Commands extends BotBase {
-  private val commands = mutable.Map[Message => Boolean, Message => Unit]()
-  def on(filter: Message => Boolean)(action: Message => Unit): Unit = commands += filter -> action
-
-  override def onMessage(message: Message): Unit = {
-    for ((filter, action) <- commands) {
-      if (filter(message)) {
-        action(message)
-      }
-    }
-  }
+trait Command extends BotBase with AkkaDefaults {
+  val botNickname: Future[String]
 
   def filterChat(message: Message): Boolean = true
 
-  def command(command: String)(message: Message)(implicit botNickname: Future[String]): Boolean = {
+  final def filterMessage(command: String)(implicit message: Message): Boolean = {
     if (filterChat(message)) {
       (message.text match {
         case Some(text) => Some(text)
@@ -44,6 +34,12 @@ trait Commands extends BotBase {
       false
     }
   }
+
+  class CommandException(message: String) extends Exception(message)
+
+  final override def onMessage(message: Message): Unit = handleMessage(message)
+
+  def handleMessage(implicit message: Message): Unit = ()
 
   def reply(text: String, replyToMessageId: Option[Long], message: Message): Future[Message] = {
     request(SendMessage(Left(message.sender), text, replyToMessageId = replyToMessageId))

@@ -1,4 +1,4 @@
-package nya.kitsunyan.littlechenbot
+package nya.kitsunyan.littlechenbot.service
 
 sealed trait BooruService {
   val iqdbId: String
