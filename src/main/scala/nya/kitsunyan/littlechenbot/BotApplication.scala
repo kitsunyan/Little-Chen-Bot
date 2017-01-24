@@ -61,15 +61,13 @@ object BotApplication extends App {
       }
 
       def readTelegramFile(fileId: String): Future[(Array[Byte], String)] = {
-        request(GetFile(fileId)).flatMap { file =>
+        request(GetFile(fileId)).map { file =>
           file.filePath match {
             case Some(path) =>
-              Future {
-                val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-                (Some(http(telegramImageUrl).asBytes.body).map { array =>
-                  if (path.endsWith(".webp")) Utils.webpToPng(array) else array
-                }.get, path)
-              }
+              val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
+              (Some(http(telegramImageUrl).asBytes.body).map { array =>
+                if (path.endsWith(".webp")) Utils.webpToPng(array) else array
+              }.get, path)
             case None => throw new BotException("Unable to fetch Telegram file.")
           }
         }
