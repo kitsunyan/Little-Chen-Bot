@@ -18,32 +18,20 @@ trait IqdbCommand extends Command {
 
   private def handleMessageInternal(implicit message: Message): Unit = {
     def extractMessageWithImage(message: Message): Option[Message] = {
-      message.caption match {
-        case Some(_) => Some(message)
-        case None => message.replyToMessage
-      }
+      message.caption.map(_ => message) orElse message.replyToMessage
     }
 
     def extractFileId(message: Message): Option[String] = {
-      message.photo match {
-        case Some(photos) =>
-          Some(photos.reduceLeft { (photo1, photo2) =>
-            // Find the largest image
-            if (photo2.fileSize.getOrElse(0) >= photo1.fileSize.getOrElse(0)) photo2 else photo1
-          }.fileId)
-        case None =>
-          message.sticker match {
-            case Some(sticker) => Some(sticker.fileId)
-            case None =>
-              message.document match {
-                case Some(document) =>
-                  document.mimeType match {
-                    case Some(mimeType) if mimeType.startsWith("image/") => Some(document.fileId)
-                    case None => None
-                  }
-                case None => None
-              }
-          }
+      message.photo.map { photos =>
+        photos.reduceLeft { (photo1, photo2) =>
+          // Find the largest image
+          if (photo2.fileSize.getOrElse(0) >= photo1.fileSize.getOrElse(0)) photo2 else photo1
+        }.fileId
+      } orElse message.sticker.map(_.fileId) orElse message.document.flatMap { document =>
+        document.mimeType match {
+          case Some(mimeType) if mimeType.startsWith("image/") => Some(document.fileId)
+          case _ => None
+        }
       }
     }
 

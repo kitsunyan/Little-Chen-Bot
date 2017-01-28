@@ -13,26 +13,13 @@ trait Command extends BotBase with AkkaDefaults {
   def filterChat(message: Message): Boolean = true
 
   final def filterMessage(command: String)(implicit message: Message): Boolean = {
-    if (filterChat(message)) {
-      (message.text match {
-        case Some(text) => Some(text)
-        case None =>
-          message.caption match {
-            case Some(caption) => Some(caption)
-            case None => None
-          }
-      }) match {
-        case Some(text) =>
-          val shortCommand = "/" + command
-          val longCommand = shortCommand + "@" + Await.result(botNickname, Duration.Inf)
-          Seq(shortCommand, longCommand).map { fullCommand =>
-            text.equals(fullCommand) || text.startsWith(fullCommand) && text.charAt(fullCommand.length) <= ' '
-          }.reduceLeft(_ || _)
-        case None => false
-      }
-    } else {
-      false
-    }
+    filterChat(message) && (message.text orElse message.caption exists { text =>
+      val shortCommand = "/" + command
+      val longCommand = shortCommand + "@" + Await.result(botNickname, Duration.Inf)
+      Seq(shortCommand, longCommand).map { fullCommand =>
+        text.equals(fullCommand) || text.startsWith(fullCommand) && text.charAt(fullCommand.length) <= ' '
+      }.reduceLeft(_ || _)
+    })
   }
 
   class CommandException(message: String) extends Exception(message)
