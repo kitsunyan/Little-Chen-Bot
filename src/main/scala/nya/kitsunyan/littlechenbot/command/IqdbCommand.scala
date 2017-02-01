@@ -60,14 +60,14 @@ trait IqdbCommand extends Command {
 
       (for {
         table <- tablePattern.findAllIn(response.body).matchData
-        (url, similarity) <- for {
-          link <- linkPattern.findAllIn(table.group(0)).matchData
-          url = (link.subgroups.head match {
-            case s if s.startsWith("//") => "https:" + s
-            case s => s
-          }, table.group(1).toInt)
-        } yield url
-      } yield (url, similarity)).toList.filter(_._2 >= minSimilarity).map(_._1)
+        similarity = table.group(1).toInt
+        if similarity >= minSimilarity
+        links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
+        url = links.head match {
+          case s if s.startsWith("//") => "https:" + s
+          case s => s
+        }
+      } yield url).toList
     }
 
     case class ImageData(url: String, pageUrl: String, characters: Set[String], artists: Set[String],

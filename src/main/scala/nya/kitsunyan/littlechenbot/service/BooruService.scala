@@ -1,9 +1,15 @@
 package nya.kitsunyan.littlechenbot.service
 
+import scala.util.matching.Regex
+
 sealed trait BooruService {
   val iqdbId: String
   def filterUrl(url: String): Boolean
   def parseHtml(html: String): Option[(String, Set[String], Set[String])]
+
+  protected def collectSet(content: String, regex: Regex): Set[String] = {
+    regex.findAllIn(content).matchData.map(_.subgroups.head).toSet
+  }
 }
 
 object BooruService {
@@ -23,10 +29,8 @@ object DanbooruService extends BooruService {
           case i if i.startsWith("/") => "https://danbooru.donmai.us" + i
           case i => i
         }
-        val characters = "<li class=\"category-4\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
-          .findAllIn(html).matchData.map(matchData => matchData.subgroups.head).toSet
-        val artists = "<li class=\"category-1\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
-          .findAllIn(html).matchData.map(matchData => matchData.subgroups.head).toSet
+        val characters = collectSet(html, "<li class=\"category-4\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r)
+        val artists = collectSet(html, "<li class=\"category-1\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r)
         Some(url, characters, artists)
       case _ => None
     }
@@ -47,10 +51,8 @@ object GelbooruService extends BooruService {
       }.toMap
       try {
         val url = map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")
-        val characters = "<li class=\"tag-type-character\"><a .*?page=post.*?>(.*?)</a>".r
-          .findAllIn(html).matchData.map(matchData => matchData.subgroups.head).toSet
-        val artists = "<li class=\"tag-type-artist\"><a .*?page=post.*?>(.*?)</a>".r
-          .findAllIn(html).matchData.map(matchData => matchData.subgroups.head).toSet
+        val characters = collectSet(html, "<li class=\"tag-type-character\"><a .*?page=post.*?>(.*?)</a>".r)
+        val artists = collectSet(html, "<li class=\"tag-type-artist\"><a .*?page=post.*?>(.*?)</a>".r)
         Some(url, characters, artists)
       } catch {
         case _: NoSuchElementException => None
