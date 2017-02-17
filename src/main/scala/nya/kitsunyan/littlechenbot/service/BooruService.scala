@@ -50,7 +50,9 @@ object GelbooruService extends BooruService {
         if (values.head != null) (key, values.head) else (key, values.last)
       }.toMap
       try {
-        val url = map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")
+        val url = Some(map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")).map { url =>
+          if (url.startsWith("//")) "https:" + url else url
+        }.get
         val characters = collectSet(html, "<li class=\"tag-type-character\"><a .*?page=post.*?>(.*?)</a>".r)
         val artists = collectSet(html, "<li class=\"tag-type-artist\"><a .*?page=post.*?>(.*?)</a>".r)
         Some(url, characters, artists)
