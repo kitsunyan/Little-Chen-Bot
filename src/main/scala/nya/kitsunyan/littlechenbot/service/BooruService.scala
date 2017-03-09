@@ -5,7 +5,7 @@ import scala.util.matching.Regex
 sealed trait BooruService {
   val iqdbId: String
   def filterUrl(url: String): Boolean
-  def parseHtml(html: String): Option[(String, Set[String], Set[String])]
+  def parseHtml(html: String): Option[(String, Set[String], Set[String], Set[String])]
 
   protected def collectSet(content: String, regex: Regex): Set[String] = {
     regex.findAllIn(content).matchData.map(_.subgroups.head).toSet
@@ -21,7 +21,7 @@ object DanbooruService extends BooruService {
 
   override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
 
-  override def parseHtml(html: String): Option[(String, Set[String], Set[String])] = {
+  override def parseHtml(html: String): Option[(String, Set[String], Set[String], Set[String])] = {
     "data-file-url=\"(.*?)\"".r.findAllIn(html).matchData.map(_.subgroups.head).toList match {
       case _ :+ imageUrl =>
         val url = imageUrl match {
@@ -30,8 +30,9 @@ object DanbooruService extends BooruService {
           case i => i
         }
         val characters = collectSet(html, "<li class=\"category-4\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r)
+        val copyrights = collectSet(html, "<li class=\"category-3\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r)
         val artists = collectSet(html, "<li class=\"category-1\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r)
-        Some(url, characters, artists)
+        Some(url, characters, copyrights, artists)
       case _ => None
     }
   }
@@ -42,7 +43,7 @@ object GelbooruService extends BooruService {
 
   override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
 
-  override def parseHtml(html: String): Option[(String, Set[String], Set[String])] = {
+  override def parseHtml(html: String): Option[(String, Set[String], Set[String], Set[String])] = {
     "(?s)<!\\[CDATA\\[.*?(.*?)\\};.*?//\\]\\]>".r.findFirstMatchIn(html).flatMap { m =>
       val map = "'(.*?)': ?(?:'(.*?)'|(\\w+))".r.findAllIn(m.subgroups.head).matchData.map { data =>
         data.subgroups.head -> data.subgroups.tail
@@ -54,8 +55,9 @@ object GelbooruService extends BooruService {
           if (url.startsWith("//")) "https:" + url else url
         }.get
         val characters = collectSet(html, "<li class=\"tag-type-character\"><a .*?page=post.*?>(.*?)</a>".r)
+        val copyrights = collectSet(html, "<li class=\"tag-type-copyright\"><a .*?page=post.*?>(.*?)</a>".r)
         val artists = collectSet(html, "<li class=\"tag-type-artist\"><a .*?page=post.*?>(.*?)</a>".r)
-        Some(url, characters, artists)
+        Some(url, characters, copyrights, artists)
       } catch {
         case _: NoSuchElementException => None
       }

@@ -70,8 +70,8 @@ trait IqdbCommand extends Command {
       } yield url).toList
     }
 
-    case class ImageData(url: String, pageUrl: String, characters: Set[String], artists: Set[String],
-      image: Option[Array[Byte]] = None)
+    case class ImageData(url: String, pageUrl: String, characters: Set[String], copyrights: Set[String],
+      artists: Set[String], image: Option[Array[Byte]] = None)
 
     def readBooruPage(pageUrl: String): ImageData = {
       (for {
@@ -80,7 +80,8 @@ trait IqdbCommand extends Command {
           val response = http(pageUrl, proxy = true).asString
           if (response.code == 200) {
             booruService.parseHtml(response.body) match {
-              case Some((url, characters, artists)) => Some(ImageData(url, pageUrl, characters, artists))
+              case Some((url, characters, copyrights, artists)) =>
+                Some(ImageData(url, pageUrl, characters, copyrights, artists))
               case None => throw new CommandException(s"Not parsed: $pageUrl.")
             }
           } else {
@@ -123,7 +124,7 @@ trait IqdbCommand extends Command {
       }
 
       val captionOption = Some(imageData.pageUrl).map(appendIterable("Characters", imageData.characters))
-        .map(appendIterable("Artists", imageData.artists))
+        .map(appendIterable("Copyrights", imageData.copyrights)).map(appendIterable("Artists", imageData.artists))
       request(SendDocument(Left(message.sender), Left(InputFile(name, imageData.image.get)),
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
