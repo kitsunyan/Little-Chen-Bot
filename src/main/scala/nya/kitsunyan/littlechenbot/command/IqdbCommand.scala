@@ -35,6 +35,15 @@ trait IqdbCommand extends Command {
       }
     }
 
+    def obtainMessageFileId: String = {
+      extractMessageWithImage(message).flatMap(extractFileId) match {
+        case Some(fileId) => fileId
+        case None =>
+          throw new CommandException("Please reply to message with image or send image with command in caption.\n" +
+            "Remember I can't see other bots' messages even when you reply them!")
+      }
+    }
+
     def readTelegramFile(fileId: String): Future[(Array[Byte], String)] = {
       request(GetFile(fileId)).map { file =>
         file.filePath match {
@@ -151,20 +160,15 @@ trait IqdbCommand extends Command {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    Future {
-      extractMessageWithImage(message).flatMap(extractFileId) match {
-        case Some(fileId) => fileId
-        case None =>
-          throw new CommandException("Please reply to message with image or send image with command in caption.\n" +
-            "Remember I can't see other bots' messages even when you reply them!")
-      }
-    }.flatMap(readTelegramFile).map((sendIqdbRequest(70) _).tupled)
-      .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith {
+    val handleError: PartialFunction[Throwable, Future[Message]] = {
       case e: CommandException =>
         replyQuote(e.getMessage)
       case e: Exception =>
         e.printStackTrace()
         replyQuote("An exception was thrown during image request.")
     }
+
+    Future(obtainMessageFileId).flatMap(readTelegramFile).map((sendIqdbRequest(70) _).tupled)
+      .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError)
   }
 }
