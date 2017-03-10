@@ -48,7 +48,7 @@ trait IqdbCommand extends Command {
       }
     }
 
-    def sendIqdbRequest(array: Array[Byte], path: String, minSimilarity: Int): List[String] = {
+    def sendIqdbRequest(minSimilarity: Int)(array: Array[Byte], path: String): List[String] = {
       val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
       val response = http("https://iqdb.org/")
         .postMulti(MultiPart("file", "filename", mimeType, array))
@@ -98,6 +98,28 @@ trait IqdbCommand extends Command {
       }
     }
 
+    def readBooruPages(pageUrls: List[String]): ImageData = {
+      case class Result(success: Boolean, imageData: Option[ImageData], exception: Option[Exception])
+
+      val result = pageUrls.foldLeft(Result(false, None, None)) { (result, pageUrl) =>
+        if (!result.success) {
+          try {
+            Result(true, Some(readBooruPage(pageUrl)), null)
+          } catch {
+            case e: Exception => Result(false, None, result.exception orElse Some(e))
+          }
+        } else {
+          result
+        }
+      }
+
+      result match {
+        case Result(true, Some(imageData), _) => imageData
+        case Result(false, _, Some(exception)) => throw exception
+        case _ => throw new CommandException("No images found.")
+      }
+    }
+
     def readBooruImage(imageData: ImageData): ImageData = {
       val response = http(imageData.url, proxy = true).asBytes
       if (response.code == 200) {
@@ -136,12 +158,8 @@ trait IqdbCommand extends Command {
           throw new CommandException("Please reply to message with image or send image with command in caption.\n" +
             "Remember I can't see other bots' messages even when you reply them!")
       }
-    }.flatMap(readTelegramFile).map { case (array, path) =>
-      sendIqdbRequest(array, path, 70) match {
-        case pageUrl :: _ => pageUrl
-        case _ => throw new CommandException("No images found.")
-      }
-    }.map(readBooruPage).map(readBooruImage).flatMap(replyWithImage).recoverWith {
+    }.flatMap(readTelegramFile).map((sendIqdbRequest(70) _).tupled)
+      .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith {
       case e: CommandException =>
         replyQuote(e.getMessage)
       case e: Exception =>
