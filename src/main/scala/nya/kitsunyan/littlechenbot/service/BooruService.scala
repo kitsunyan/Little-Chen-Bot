@@ -44,15 +44,15 @@ object YandereService extends BooruService {
   override def filterUrl(url: String): Boolean = url.contains("//yande.re")
 
   override def parseHtml(html: String): Option[(String, Set[String], Set[String], Set[String])] = {
-    "<a class=\"original-file-unchanged\" .*?href=\"(.*?)\"".r.findAllIn(html).matchData
-      .map(_.subgroups.head).toList match {
-      case _ :+ imageUrl =>
-        def mapper(s: String): String = s.replace('_', ' ')
-        val characters = collectSet(html, "<li class=\".*?tag-type-character\" .*?data-name=\"(.*?)\"".r).map(mapper)
-        val copyrights = collectSet(html, "<li class=\".*?tag-type-copyright\" .*?data-name=\"(.*?)\"".r).map(mapper)
-        val artists = collectSet(html, "<li class=\".*?tag-type-artist\" .*?data-name=\"(.*?)\"".r).map(mapper)
-        Some(imageUrl, characters, copyrights, artists)
-      case _ => None
+    def matchOption(r: Regex): Option[String] = r.findAllIn(html).matchData.map(_.subgroups.head).toList.headOption
+    def fixTag(s: String): String = s.replace('_', ' ')
+
+    (matchOption("<a class=\"original-file-unchanged\" .*?href=\"(.*?)\"".r) orElse
+      matchOption("<a class=\"original-file-changed\" .*?href=\"(.*?)\"".r)).map { imageUrl =>
+      val characters = collectSet(html, "<li class=\".*?tag-type-character\" .*?data-name=\"(.*?)\"".r).map(fixTag)
+      val copyrights = collectSet(html, "<li class=\".*?tag-type-copyright\" .*?data-name=\"(.*?)\"".r).map(fixTag)
+      val artists = collectSet(html, "<li class=\".*?tag-type-artist\" .*?data-name=\"(.*?)\"".r).map(fixTag)
+      (imageUrl, characters, copyrights, artists)
     }
   }
 }
