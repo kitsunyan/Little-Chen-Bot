@@ -3,60 +3,17 @@ package nya.kitsunyan.littlechenbot.command
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
-import nya.kitsunyan.littlechenbot.Utils
 import nya.kitsunyan.littlechenbot.service.BooruService
 
 import scala.concurrent.Future
 import scalaj.http._
 
-trait IqdbCommand extends Command {
-  def http(url: String, proxy: Boolean = false): HttpRequest
-
+trait IqdbCommand extends Command with ExtractImage with Http {
   override def handleMessage(implicit message: Message): Unit = {
     if (filterMessage("iqdb")) handleMessageInternal else super.handleMessage
   }
 
   private def handleMessageInternal(implicit message: Message): Unit = {
-    def extractMessageWithImage(message: Message): Option[Message] = {
-      message.caption.map(_ => message) orElse message.replyToMessage
-    }
-
-    def extractFileId(message: Message): Option[String] = {
-      message.photo.map { photos =>
-        photos.reduceLeft { (photo1, photo2) =>
-          // Find the largest image
-          if (photo2.fileSize.getOrElse(0) >= photo1.fileSize.getOrElse(0)) photo2 else photo1
-        }.fileId
-      } orElse message.sticker.map(_.fileId) orElse message.document.flatMap { document =>
-        document.mimeType match {
-          case Some(mimeType) if mimeType.startsWith("image/") => Some(document.fileId)
-          case _ => None
-        }
-      }
-    }
-
-    def obtainMessageFileId: String = {
-      extractMessageWithImage(message).flatMap(extractFileId) match {
-        case Some(fileId) => fileId
-        case None =>
-          throw new CommandException("Please reply to message with image or send image with command in caption.\n" +
-            "Remember I can't see other bots' messages even when you reply them!")
-      }
-    }
-
-    def readTelegramFile(fileId: String): Future[(Array[Byte], String)] = {
-      request(GetFile(fileId)).map { file =>
-        file.filePath match {
-          case Some(path) =>
-            val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-            (Some(http(telegramImageUrl).asBytes.body).map { array =>
-              if (path.endsWith(".webp")) Utils.webpToPng(array) else array
-            }.get, path)
-          case None => throw new CommandException("Unable to fetch Telegram file.")
-        }
-      }
-    }
-
     def sendIqdbRequest(minSimilarity: Int)(array: Array[Byte], path: String): List[String] = {
       val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
       val response = http("https://iqdb.org/")
@@ -160,15 +117,7 @@ trait IqdbCommand extends Command {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    val handleError: PartialFunction[Throwable, Future[Message]] = {
-      case e: CommandException =>
-        replyQuote(e.getMessage)
-      case e: Exception =>
-        e.printStackTrace()
-        replyQuote("An exception was thrown during image request.")
-    }
-
     Future(obtainMessageFileId).flatMap(readTelegramFile).map((sendIqdbRequest(70) _).tupled)
-      .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError)
+      .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError("image request"))
   }
 }
