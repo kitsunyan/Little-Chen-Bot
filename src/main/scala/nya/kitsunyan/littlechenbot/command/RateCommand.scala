@@ -21,6 +21,7 @@ trait RateCommand extends Command with ExtractImage with Http {
     "CAADAgADvAEAAiX3NwjfcYlO4i9glwI" ::
     "CAADAgADvQEAAiX3NwjWF5kVFi1kIQI" ::
     "CAADAgADvgEAAiX3NwjxCFfNfFfOmgI" ::
+    "CAADAgADxgEAAiX3NwgpkLZRMe1h0wI" ::
     Nil
 
   override def handleMessage(implicit message: Message): Unit = {
@@ -42,7 +43,7 @@ trait RateCommand extends Command with ExtractImage with Http {
     def replyWithRating(rating: Float): Future[Message] = {
       val value = {
         val tmp = (rating * 10).toInt
-        if (tmp > 9) 9 else if (tmp < 0) 0 else tmp
+        if (tmp > 10) 10 else if (tmp < 0) 0 else tmp
       }
 
       request(SendSticker(Left(message.sender), Right(ratings(value)),
