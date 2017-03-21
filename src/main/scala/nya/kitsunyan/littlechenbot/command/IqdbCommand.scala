@@ -6,7 +6,6 @@ import info.mukel.telegrambot4s.models._
 import nya.kitsunyan.littlechenbot.service.BooruService
 
 import scala.concurrent.Future
-import scalaj.http._
 
 trait IqdbCommand extends Command with ExtractImage with Http {
   override def handleMessage(implicit message: Message): Unit = {
@@ -14,10 +13,9 @@ trait IqdbCommand extends Command with ExtractImage with Http {
   }
 
   private def handleMessageInternal(implicit message: Message): Unit = {
-    def sendIqdbRequest(minSimilarity: Int)(array: Array[Byte], path: String): List[String] = {
-      val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
+    def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[String] = {
       val response = http("https://iqdb.org/")
-        .postMulti(MultiPart("file", "filename", mimeType, array))
+        .postMulti(telegramFile.multiPart("file"))
         .params(BooruService.list.map("service[]" -> _.iqdbId)).asString
 
       val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
@@ -117,7 +115,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    Future(obtainMessageFileId).flatMap(readTelegramFile).map((sendIqdbRequest(70) _).tupled)
+    Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendIqdbRequest(70))
       .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError("image request"))
   }
 }

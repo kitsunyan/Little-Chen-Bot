@@ -2,10 +2,10 @@ package nya.kitsunyan.littlechenbot.command
 
 import info.mukel.telegrambot4s.methods.GetFile
 import info.mukel.telegrambot4s.models.Message
-
 import nya.kitsunyan.littlechenbot.Utils
 
 import scala.concurrent.Future
+import scalaj.http.MultiPart
 
 trait ExtractImage extends Command with Http {
   def extractMessageWithImage(message: Message): Option[Message] = {
@@ -35,14 +35,21 @@ trait ExtractImage extends Command with Http {
     }
   }
 
-  def readTelegramFile(fileId: String): Future[(Array[Byte], String)] = {
+  case class TelegramFile(data: Array[Byte], mimeType: String) {
+    def multiPart(name: String): MultiPart = MultiPart(name, "filename", mimeType, data)
+  }
+
+  def readTelegramFile(fileId: String): Future[TelegramFile] = {
     request(GetFile(fileId)).map { file =>
       file.filePath match {
         case Some(path) =>
-          val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-          (Some(http(telegramImageUrl).asBytes.body).map { array =>
-            if (path.endsWith(".webp")) Utils.webpToPng(array) else array
-          }.get, path)
+          val data = {
+            val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
+            val data = http(telegramImageUrl).asBytes.body
+            if (path.endsWith(".webp")) Utils.webpToPng(data) else data
+          }
+          val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
+          TelegramFile(data, mimeType)
         case None => throw new CommandException("Unable to fetch Telegram file.")
       }
     }

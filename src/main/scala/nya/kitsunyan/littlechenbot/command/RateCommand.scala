@@ -7,7 +7,6 @@ import org.json4s._
 import org.json4s.jackson.JsonMethods._
 
 import scala.concurrent.Future
-import scalaj.http.MultiPart
 
 trait RateCommand extends Command with ExtractImage with Http {
   private val ratings =
@@ -29,10 +28,9 @@ trait RateCommand extends Command with ExtractImage with Http {
   }
 
   private def handleMessageInternal(implicit message: Message): Unit = {
-    def sendEverypixelRequest(array: Array[Byte], path: String): Float = {
-      val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
+    def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
       val response = http("https://services2.microstock.pro/aesthetics/quality")
-        .postMulti(MultiPart("data", "filename", mimeType, array)).asString
+        .postMulti(telegramFile.multiPart("data")).asString
 
       parse(response.body) \ "quality" \ "score" match {
         case JDouble(rating) => rating.toFloat
@@ -50,7 +48,7 @@ trait RateCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.replyToMessage.getOrElse(message).messageId)))
     }
 
-    Future(obtainMessageFileId).flatMap(readTelegramFile).map((sendEverypixelRequest _).tupled)
+    Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendEverypixelRequest)
       .flatMap(replyWithRating).recoverWith(handleError("rating request"))
   }
 }
