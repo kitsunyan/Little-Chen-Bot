@@ -117,11 +117,18 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    val similarity = arguments.int("s", "min-similarity")
-      .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
-      .getOrElse(70)
+    arguments.string("h", "help") match {
+      case Some(_) =>
+        replyQuote("Fetch image from *booru using iqdb.org." +
+          "\n\n" + "-s, --min-similarity [0-100] — set minimum allowed similarity for found images." +
+          "\n" + "-h, --help — display this help.")
+      case None =>
+        val similarity = arguments.int("s", "min-similarity")
+          .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
+          .getOrElse(70)
 
-    Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendIqdbRequest(similarity))
-      .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError("image request"))
+        Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendIqdbRequest(similarity))
+          .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError("image request"))
+    }
   }
 }
