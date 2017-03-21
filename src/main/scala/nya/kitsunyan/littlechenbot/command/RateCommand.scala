@@ -24,10 +24,12 @@ trait RateCommand extends Command with ExtractImage with Http {
     Nil
 
   override def handleMessage(implicit message: Message): Unit = {
-    if (filterMessage("rate") || filterMessage("r8")) handleMessageInternal else super.handleMessage
+    (filterMessage("rate") orElse filterMessage("r8"))
+      .map(handleMessageInternal)
+      .getOrElse(super.handleMessage)
   }
 
-  private def handleMessageInternal(implicit message: Message): Unit = {
+  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Unit = {
     def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
       val response = http("https://services2.microstock.pro/aesthetics/quality")
         .postMulti(telegramFile.multiPart("data")).asString

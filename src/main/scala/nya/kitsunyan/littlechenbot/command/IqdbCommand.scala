@@ -9,10 +9,12 @@ import scala.concurrent.Future
 
 trait IqdbCommand extends Command with ExtractImage with Http {
   override def handleMessage(implicit message: Message): Unit = {
-    if (filterMessage("iqdb")) handleMessageInternal else super.handleMessage
+    filterMessage("iqdb")
+      .map(handleMessageInternal)
+      .getOrElse(super.handleMessage)
   }
 
-  private def handleMessageInternal(implicit message: Message): Unit = {
+  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Unit = {
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[String] = {
       val response = http("https://iqdb.org/")
         .postMulti(telegramFile.multiPart("file"))
@@ -115,7 +117,11 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendIqdbRequest(70))
+    val similarity = arguments.int("s", "min-similarity")
+      .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
+      .getOrElse(70)
+
+    Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendIqdbRequest(similarity))
       .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError("image request"))
   }
 }
