@@ -14,6 +14,10 @@ sealed trait BooruService {
 
 object BooruService {
   val list: List[BooruService] = List(DanbooruService, YandereService, GelbooruService)
+
+  def findByUrl(url: String): Option[BooruService] = {
+    list.find(_.filterUrl(url))
+  }
 }
 
 object DanbooruService extends BooruService {

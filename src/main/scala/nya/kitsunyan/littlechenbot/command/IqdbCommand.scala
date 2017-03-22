@@ -40,28 +40,19 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       artists: Set[String], image: Option[Array[Byte]] = None)
 
     def readBooruPage(pageUrl: String): ImageData = {
-      (for {
-        booruService <- BooruService.list
-        imageData = if (booruService.filterUrl(pageUrl)) {
-          val response = http(pageUrl, proxy = true).asString
-          if (response.code == 200) {
-            booruService.parseHtml(response.body) match {
-              case Some((url, characters, copyrights, artists)) =>
-                Some(ImageData(url, pageUrl, characters, copyrights, artists))
-              case None => throw new CommandException(s"Not parsed: $pageUrl.")
-            }
-          } else {
-            val code = response.code
-            throw new Exception(s"Invalid response: $code.")
+      BooruService.findByUrl(pageUrl).map { booruService =>
+        val response = http(pageUrl, proxy = true).asString
+        if (response.code == 200) {
+          booruService.parseHtml(response.body) match {
+            case Some((url, characters, copyrights, artists)) =>
+              ImageData(url, pageUrl, characters, copyrights, artists)
+            case None => throw new CommandException(s"Not parsed: $pageUrl.")
           }
         } else {
-          None
+          val code = response.code
+          throw new Exception(s"Invalid response: $code.")
         }
-        if imageData.nonEmpty
-      } yield imageData.get) match {
-        case List(result) => result
-        case _ => throw new CommandException("Unknown service.")
-      }
+      }.getOrElse(throw new CommandException("Unknown service."))
     }
 
     def readBooruPages(pageUrls: List[String]): ImageData = {
