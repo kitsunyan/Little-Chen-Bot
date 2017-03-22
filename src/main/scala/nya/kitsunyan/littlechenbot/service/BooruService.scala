@@ -4,6 +4,7 @@ import scala.util.matching.Regex
 
 sealed trait BooruService {
   val iqdbId: String
+  val commonNames: List[String]
   def filterUrl(url: String): Boolean
   def parseHtml(html: String): Option[(String, Set[String], Set[String], Set[String])]
 
@@ -22,6 +23,7 @@ object BooruService {
 
 object DanbooruService extends BooruService {
   override val iqdbId: String = "1"
+  override val commonNames: List[String] = List("danbooru", "danbooru.donmai.us")
 
   override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
 
@@ -44,6 +46,7 @@ object DanbooruService extends BooruService {
 
 object YandereService extends BooruService {
   override val iqdbId: String = "3"
+  override val commonNames: List[String] = List("yandere", "yande.re")
 
   override def filterUrl(url: String): Boolean = url.contains("//yande.re")
 
@@ -63,6 +66,7 @@ object YandereService extends BooruService {
 
 object GelbooruService extends BooruService {
   override val iqdbId: String = "4"
+  override val commonNames: List[String] = List("gelbooru", "gelbooru.com")
 
   override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
 

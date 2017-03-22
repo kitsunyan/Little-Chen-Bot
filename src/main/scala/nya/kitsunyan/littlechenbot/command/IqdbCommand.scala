@@ -15,7 +15,9 @@ trait IqdbCommand extends Command with ExtractImage with Http {
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Unit = {
-    def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[String] = {
+    case class IqdbResult(url: String, similarity: Int, matches: Boolean)
+
+    def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
       val response = http("https://iqdb.org/")
         .postMulti(telegramFile.multiPart("file"))
         .params(BooruService.list.map("service[]" -> _.iqdbId)).asString
@@ -27,25 +29,26 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       (for {
         table <- tablePattern.findAllIn(response.body).matchData
         similarity = table.group(1).toInt
-        if similarity >= minSimilarity
         links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
         url = links.head match {
           case s if s.startsWith("//") => "https:" + s
           case s => s
         }
-      } yield url).toList
+        matches = similarity >= minSimilarity
+      } yield IqdbResult(url, similarity, matches)).toList
     }
 
     case class ImageData(url: String, pageUrl: String, characters: Set[String], copyrights: Set[String],
       artists: Set[String], image: Option[Array[Byte]] = None)
 
-    def readBooruPage(pageUrl: String): ImageData = {
+    def readBooruPage(pageUrl: String): (ImageData, BooruService) = {
       BooruService.findByUrl(pageUrl).map { booruService =>
         val response = http(pageUrl, proxy = true).asString
         if (response.code == 200) {
           booruService.parseHtml(response.body) match {
             case Some((url, characters, copyrights, artists)) =>
-              ImageData(url, pageUrl, characters, copyrights, artists)
+              val imageData = ImageData(url, pageUrl, characters, copyrights, artists)
+              (imageData, booruService)
             case None => throw new CommandException(s"Not parsed: $pageUrl.")
           }
         } else {
@@ -55,25 +58,47 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       }.getOrElse(throw new CommandException("Unknown service."))
     }
 
-    def readBooruPages(pageUrls: List[String]): ImageData = {
-      case class Result(success: Boolean, imageData: Option[ImageData], exception: Option[Exception])
+    def readBooruPages(iqdbResults: List[IqdbResult]): ImageData = {
+      case class BooruPage(imageData: Option[ImageData], service: BooruService, similarity: Int)
+      case class Result(list: List[BooruPage], exception: Option[Exception])
 
-      val result = pageUrls.foldLeft(Result(false, None, None)) { (result, pageUrl) =>
-        if (!result.success) {
+      val result = iqdbResults.foldLeft(Result(Nil, None)) { (result, iqdbResult) =>
+        if (iqdbResult.matches) {
           try {
-            Result(true, Some(readBooruPage(pageUrl)), null)
+            val (imageData, booruService) = readBooruPage(iqdbResult.url)
+            result.copy(list = BooruPage(Some(imageData), booruService, iqdbResult.similarity) :: result.list)
           } catch {
-            case e: Exception => Result(false, None, result.exception orElse Some(e))
+            case e: Exception => result.copy(exception = result.exception orElse Some(e))
           }
         } else {
-          result
+          BooruService.findByUrl(iqdbResult.url)
+            .map(s => result.copy(list = BooruPage(None, s, iqdbResult.similarity) :: result.list))
+            .getOrElse(result)
         }
       }
 
-      result match {
-        case Result(true, Some(imageData), _) => imageData
-        case Result(false, _, Some(exception)) => throw exception
-        case _ => throw new CommandException("No images found.")
+      result.list
+        .map(_.imageData).find(_.nonEmpty).flatten
+        .getOrElse {
+        if (result.list.nonEmpty) {
+          val notFoundMessage = result.exception.map { e =>
+            handleException(e)
+            "No images found (due to exception thrown)."
+          }.getOrElse("No images found.")
+
+          val (_, additionalResults) = result.list.map { booruPage =>
+            val serviceName = booruPage.service.commonNames.head
+            val similarity = booruPage.similarity
+            s"$similarity% — $serviceName"
+          }.foldLeft((1, "")) { (tuple, value) =>
+            val (count, result) = tuple
+            (count + 1, result + s"\n$count: $value")
+          }
+
+          throw new CommandException(s"$notFoundMessage\n\nAdditional results:$additionalResults")
+        } else {
+          throw result.exception.getOrElse(new CommandException("No images found."))
+        }
       }
     }
 
