@@ -58,7 +58,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       }.getOrElse(throw new CommandException("Unknown service."))
     }
 
-    def readBooruPages(iqdbResults: List[IqdbResult]): ImageData = {
+    def readBooruPages(priority: List[String])(iqdbResults: List[IqdbResult]): ImageData = {
       case class BooruPage(imageData: Option[ImageData], service: BooruService, similarity: Int)
       case class Result(list: List[BooruPage], exception: Option[Exception])
 
@@ -78,7 +78,23 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           }
         }
 
-        result.copy(list = result.list.sortWith(_.similarity > _.similarity))
+        val servicesPriority = priority.flatMap(BooruService.findByName)
+
+        result.copy(list = result.list.sortWith { (a, b) =>
+          val aindex = servicesPriority.indexOf(a.service)
+          val bindex = servicesPriority.indexOf(b.service)
+          if (aindex >= 0 && bindex >= 0) {
+            if (aindex == bindex) {
+              a.similarity > b.similarity
+            } else {
+              aindex < bindex
+            }
+          } else if (aindex >= 0 || bindex >= 0) {
+            aindex >= 0
+          } else {
+            a.similarity > b.similarity
+          }
+        })
       }
 
       result.list
@@ -141,14 +157,19 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       case Some(_) =>
         replyQuote("Fetch image from *booru using iqdb.org." +
           "\n\n" + "-s, --min-similarity [0-100] — set minimum allowed similarity for found images." +
+          "\n" + "-p, --priority [string list] — set priority for *booru services." +
           "\n" + "-h, --help — display this help.")
       case None =>
         val similarity = arguments.int("s", "min-similarity")
           .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
           .getOrElse(70)
 
+        val priority = arguments.string("p", "priority")
+          .map(_.split(",|\\s+").toList.filter(!_.isEmpty)).getOrElse(Nil)
+
         Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendIqdbRequest(similarity))
-          .map(readBooruPages).map(readBooruImage).flatMap(replyWithImage).recoverWith(handleError("image request"))
+          .map(readBooruPages(priority)).map(readBooruImage).flatMap(replyWithImage)
+          .recoverWith(handleError("image request"))
     }
   }
 }

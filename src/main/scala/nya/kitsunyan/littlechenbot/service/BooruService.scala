@@ -19,6 +19,10 @@ object BooruService {
   def findByUrl(url: String): Option[BooruService] = {
     list.find(_.filterUrl(url))
   }
+
+  def findByName(name: String): Option[BooruService] = {
+    list.find(_.commonNames.contains(name.toLowerCase))
+  }
 }
 
 object DanbooruService extends BooruService {
