@@ -62,19 +62,23 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       case class BooruPage(imageData: Option[ImageData], service: BooruService, similarity: Int)
       case class Result(list: List[BooruPage], exception: Option[Exception])
 
-      val result = iqdbResults.foldLeft(Result(Nil, None)) { (result, iqdbResult) =>
-        if (iqdbResult.matches) {
-          try {
-            val (imageData, booruService) = readBooruPage(iqdbResult.url)
-            result.copy(list = BooruPage(Some(imageData), booruService, iqdbResult.similarity) :: result.list)
-          } catch {
-            case e: Exception => result.copy(exception = result.exception orElse Some(e))
+      val result = {
+        val result = iqdbResults.foldLeft(Result(Nil, None)) { (result, iqdbResult) =>
+          if (iqdbResult.matches) {
+            try {
+              val (imageData, booruService) = readBooruPage(iqdbResult.url)
+              result.copy(list = BooruPage(Some(imageData), booruService, iqdbResult.similarity) :: result.list)
+            } catch {
+              case e: Exception => result.copy(exception = result.exception orElse Some(e))
+            }
+          } else {
+            BooruService.findByUrl(iqdbResult.url)
+              .map(s => result.copy(list = BooruPage(None, s, iqdbResult.similarity) :: result.list))
+              .getOrElse(result)
           }
-        } else {
-          BooruService.findByUrl(iqdbResult.url)
-            .map(s => result.copy(list = BooruPage(None, s, iqdbResult.similarity) :: result.list))
-            .getOrElse(result)
         }
+
+        result.copy(list = result.list.sortWith(_.similarity > _.similarity))
       }
 
       result.list
