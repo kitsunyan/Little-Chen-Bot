@@ -59,7 +59,7 @@ trait ExtractImage extends Command with Http {
     case e: CommandException =>
       replyQuote(e.getMessage)
     case e: Exception =>
-      e.printStackTrace()
+      handleException(e)
       replyQuote(s"An exception was thrown during $kind.")
   }
 }

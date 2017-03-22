@@ -37,6 +37,10 @@ object BotApplication extends App {
         chatsAnyGroup && Set("group", "supergroup").contains(message.chat.`type`))
     }
 
+    override def handleException(e: Throwable): Unit = {
+      e.printStackTrace()
+    }
+
     override def http(url: String, proxy: Boolean): HttpRequest = {
       Some(Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 10000)
         .option(HttpOptions.followRedirects(true))).map { request =>

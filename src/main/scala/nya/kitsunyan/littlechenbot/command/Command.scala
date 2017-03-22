@@ -12,6 +12,8 @@ trait Command extends BotBase with AkkaDefaults {
 
   def filterChat(message: Message): Boolean = true
 
+  def handleException(e: Throwable): Unit
+
   class Arguments(data: String) {
     private def parseArguments(data: String): Map[String, String] = {
       case class CharFold(quote: Boolean = false, escape: Boolean = false,
