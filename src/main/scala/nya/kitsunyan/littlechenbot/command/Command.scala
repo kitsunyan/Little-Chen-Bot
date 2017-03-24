@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import info.mukel.telegrambot4s.api._
+import info.mukel.telegrambot4s.methods.ParseMode.ParseMode
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
@@ -101,15 +102,36 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleMessage(implicit message: Message): Unit = ()
 
-  def reply(text: String, replyToMessageId: Option[Long], message: Message): Future[Message] = {
-    request(SendMessage(Left(message.sender), text, replyToMessageId = replyToMessageId))
+  def replyQuote(text: String, parseMode: Option[ParseMode] = None)(implicit message: Message): Future[Message] = {
+    request(SendMessage(Left(message.sender), text, parseMode, replyToMessageId = Some(message.messageId)))
   }
 
-  def replyQuote(text: String)(implicit message: Message): Future[Message] = {
-    reply(text, Some(message.messageId), message)
+  def reply(text: String, parseMode: Option[ParseMode] = None)(implicit message: Message): Future[Message] = {
+    request(SendMessage(Left(message.sender), text, parseMode))
   }
 
-  def reply(text: String)(implicit message: Message): Future[Message] = {
-    reply(text, None, message)
+  def replyMan(description: String, list: List[(List[String], Option[String], String)])
+    (implicit message: Message): Future[Message] = {
+    val argumentsListText = list.map { case (parameters, values, description) =>
+      val parametersFull = "`" + parameters.reduce(_ + "`, `" + _) + "`"
+      val maxLength = 30
+      val space = "    "
+
+      val (_, descriptionFull) = description.split(" +").foldLeft((maxLength, "")) { (acc, value) =>
+        val (line, result) = acc
+        val length = value.length + (if (line > 0) 1 else 0)
+        if (line + length > maxLength && line > 0) {
+          (value.length, s"$result\n$space$value")
+        } else {
+          (line + length, s"$result $value")
+        }
+      }
+
+      val valuesFull = values.map(v => s" `[$v]`").getOrElse("")
+      s"$parametersFull$valuesFull$descriptionFull"
+    }.reduce(_ + "\n" + _)
+
+    val text = if (argumentsListText.nonEmpty) s"$description\n\n$argumentsListText" else description
+    replyQuote(text, Some(ParseMode.Markdown))
   }
 }

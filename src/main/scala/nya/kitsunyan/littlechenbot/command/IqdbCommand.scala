@@ -143,10 +143,14 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
     arguments.string("h", "help") match {
       case Some(_) =>
-        replyQuote("Fetch image from *booru using iqdb.org." +
-          "\n\n" + "-s, --min-similarity [0-100] — set minimum allowed similarity for found images." +
-          "\n" + "-p, --priority [string list] — set priority for *booru services." +
-          "\n" + "-h, --help — display this help.")
+        replyMan("Fetch image from \\*booru using iqdb.org.",
+          (List("-s", "--min-similarity"), Some("0-100"),
+            "Set minimum allowed similarity for found images.") ::
+          (List("-p", "--priority"), Some("string list"),
+            "Set priority for \\*booru services.") ::
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
       case None =>
         val similarity = arguments.int("s", "min-similarity")
           .map(s => if (s > 100) 100 else if (s < 0) 0 else s)

@@ -52,8 +52,10 @@ trait RateCommand extends Command with ExtractImage with Http {
 
     arguments.string("h", "help") match {
       case Some(_) =>
-        replyQuote("Rate image using everypixel.com." +
-          "\n\n" +" -h, --help — display this help.")
+        replyMan("Rate image using everypixel.com.",
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
       case None =>
         Future(obtainMessageFileId(messageWithImage)).flatMap(readTelegramFile)
           .map(sendEverypixelRequest).flatMap(replyWithRating)
