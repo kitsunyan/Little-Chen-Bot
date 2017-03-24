@@ -143,17 +143,32 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    arguments.string("h", "help") match {
-      case Some(_) =>
+    (arguments.string("h", "help"), arguments.string(null, "example")) match {
+      case (Some(_), _) =>
         replyMan("Fetch image from \\*booru using iqdb.org.",
           (List("-s", "--min-similarity"), Some("0-100"),
             "Set minimum allowed similarity for found images.") ::
           (List("-p", "--priority"), Some("string list"),
             "Set priority for \\*booru services.") ::
+          (List("--example"), None,
+            "Print examples of usage.") ::
           (List("-h", "--help"), None,
             "Display this help.") ::
           Nil)
-      case None =>
+      case (_, Some(_)) =>
+        replyQuote("Examples of usage:" +
+          "\n\nFetch first image with similarity >= 50%:" +
+          "\n    `/iqdb --min-similarity 50`" +
+          "\n    `/iqdb -s 50`" +
+          "\n\nFetch first image from danbooru if possible:" +
+          "\n    `/iqdb --priority danbooru`" +
+          "\n    `/iqdb -p danbooru`" +
+          "\n\nFetch first image from danbooru or gelbooru if possible:" +
+          "\n    `/iqdb -p \"danbooru gelbooru\"`" +
+          "\n\nFetch first image from danbooru with similarity >= 50%:" +
+          "\n    `/iqdb -p danbooru -s 50`",
+          Some(ParseMode.Markdown))
+      case _ =>
         val similarity = arguments.int("s", "min-similarity")
           .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
           .getOrElse(70)
