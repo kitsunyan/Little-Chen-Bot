@@ -18,26 +18,26 @@ trait IqdbCommand extends Command with ExtractImage with Http {
     case class IqdbResult(url: String, booruService: BooruService, similarity: Int, matches: Boolean)
 
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
-      val response = http("https://iqdb.org/")
+      http("https://iqdb.org/")
         .postMulti(telegramFile.multiPart("file"))
-        .params(BooruService.list.map("service[]" -> _.iqdbId)).asString
+        .params(BooruService.list.map("service[]" -> _.iqdbId)).response(_.asString) { _ => body =>
+        val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
+          "<td>(\\d+)% similarity</td>.*?</table>").r
+        val linkPattern = "<a href=\"(.*?)\">".r
 
-      val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
-        "<td>(\\d+)% similarity</td>.*?</table>").r
-      val linkPattern = "<a href=\"(.*?)\">".r
-
-      (for {
-        table <- tablePattern.findAllIn(response.body).matchData
-        similarity = table.group(1).toInt
-        links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
-        url = links.head match {
-          case s if s.startsWith("//") => "https:" + s
-          case s => s
-        }
-        matches = similarity >= minSimilarity
-        booruService = BooruService.findByUrl(url)
-        if booruService.nonEmpty
-      } yield IqdbResult(url, booruService.get, similarity, matches)).toList
+        (for {
+          table <- tablePattern.findAllIn(body).matchData
+          similarity = table.group(1).toInt
+          links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
+          url = links.head match {
+            case s if s.startsWith("//") => "https:" + s
+            case s => s
+          }
+          matches = similarity >= minSimilarity
+          booruService = BooruService.findByUrl(url)
+          if booruService.nonEmpty
+        } yield IqdbResult(url, booruService.get, similarity, matches)).toList
+      }
     }
 
     def applyPriority(priority: List[String])(iqdbResults: List[IqdbResult]): List[IqdbResult] = {
@@ -68,22 +68,17 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
     def readBooruPage(iqdbResult: IqdbResult): ImageData = {
       val pageUrl = iqdbResult.url
-      val response = http(pageUrl, proxy = true).asString
-      if (response.code == 200) {
-        iqdbResult.booruService.parseHtml(response.body) match {
+      http(pageUrl, proxy = true).response(_.asString) { _ => body =>
+        iqdbResult.booruService.parseHtml(body) match {
           case Some((url, characters, copyrights, artists)) =>
             ImageData(url, pageUrl, characters, copyrights, artists)
-          case None => throw new CommandException(s"Not parsed: $pageUrl.")
+          case None => throw new Exception(s"Not parsed: $pageUrl.")
         }
-      } else {
-        val code = response.code
-        throw new Exception(s"Invalid response: $code.")
       }
     }
 
     def readBooruImage(imageData: ImageData): ReadImageData = {
-      val response = http(imageData.url, proxy = true).asBytes
-      if (response.code == 200) {
+      http(imageData.url, proxy = true).response(_.asBytes) { _ => body =>
         val name = {
           val url = imageData.url
           val start = url.lastIndexOf('/') + 1
@@ -91,11 +86,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           if (end >= start) url.substring(start, end) else url.substring(start)
         }
 
-        ReadImageData(name, response.body, imageData.pageUrl,
+        ReadImageData(name, body, imageData.pageUrl,
           imageData.characters, imageData.copyrights, imageData.artists)
-      } else {
-        val code = response.code
-        throw new Exception(s"Invalid response: $code.")
       }
     }
 
