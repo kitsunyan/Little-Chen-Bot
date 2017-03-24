@@ -32,7 +32,7 @@ object BotApplication extends App {
     private val chats = config(config.getLongList, "bot.chats").getOrElse(java.util.Collections.emptyList)
     private val chatsAnyPrivate = config(config.getBoolean, "bot.chatsAnyPrivate").getOrElse(false)
     private val chatsAnyGroup = config(config.getBoolean, "bot.chatsAnyGroup").getOrElse(false)
-    private val startTime = System.currentTimeMillis / 1000
+    private val startTime = executionStart / 1000
 
     override def filterChat(message: Message): Boolean = {
       message.date >= startTime && (chats.contains(message.chat.id) ||
