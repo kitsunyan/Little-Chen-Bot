@@ -61,8 +61,12 @@ trait Command extends BotBase with AkkaDefaults {
 
     private val arguments = parseArguments(data)
 
+    private def option(prefix: String, key: String): Option[String] = {
+      Option(key).map(prefix + _).flatMap(arguments.get)
+    }
+
     def string(shortKey: String, longKey: String): Option[String] = {
-      arguments.get("-" + shortKey) orElse arguments.get("--" + longKey) orElse arguments.get("—" + longKey)
+      option("-", shortKey) orElse option("--", longKey) orElse option("—", longKey)
     }
 
     def int(shortKey: String, longKey: String): Option[Int] = {
