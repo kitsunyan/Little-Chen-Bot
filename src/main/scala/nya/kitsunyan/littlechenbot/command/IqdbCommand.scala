@@ -8,8 +8,10 @@ import nya.kitsunyan.littlechenbot.service.BooruService
 import scala.concurrent.Future
 
 trait IqdbCommand extends Command with ExtractImage with Http {
+  private val commands = List("iqdb")
+
   override def handleMessage(implicit message: Message): Unit = {
-    filterMessage("iqdb")
+    filterMessage(commands)
       .map(handleMessageInternal)
       .getOrElse(super.handleMessage)
   }
@@ -159,7 +161,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         val priority = arguments.string("p", "priority")
           .map(_.split(",|\\s+").toList.filter(!_.isEmpty)).getOrElse(Nil)
 
-        Future(obtainMessageFileId(messageWithImage)).flatMap(readTelegramFile)
+        Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
           .map(sendIqdbRequest(similarity)).map(applyPriority(priority)).map(readBooruImages)
           .flatMap(replyWithImage).recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }

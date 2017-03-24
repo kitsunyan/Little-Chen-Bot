@@ -100,7 +100,11 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  class CommandException(message: String) extends Exception(message)
+  final def filterMessage(commands: List[String])(implicit message: Message): Option[Arguments] = {
+    commands.foldLeft[Option[Arguments]](None)(_ orElse filterMessage(_))
+  }
+
+  class CommandException(message: String, val parseMode: Option[ParseMode] = None) extends Exception(message)
 
   final override def onMessage(message: Message): Unit = handleMessage(message)
 

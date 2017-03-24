@@ -9,6 +9,8 @@ import org.json4s.jackson.JsonMethods._
 import scala.concurrent.Future
 
 trait RateCommand extends Command with ExtractImage with Http {
+  private val commands = List("rate", "r8")
+
   private val ratings =
     "CAADAgADtQEAAiX3NwilKgTAwYCiHAI" ::
     "CAADAgADtgEAAiX3NwhWCJAp-ZtVRwI" ::
@@ -24,7 +26,7 @@ trait RateCommand extends Command with ExtractImage with Http {
     Nil
 
   override def handleMessage(implicit message: Message): Unit = {
-    (filterMessage("rate") orElse filterMessage("r8"))
+    filterMessage(commands)
       .map(handleMessageInternal)
       .getOrElse(super.handleMessage)
   }
@@ -57,7 +59,7 @@ trait RateCommand extends Command with ExtractImage with Http {
             "Display this help.") ::
           Nil)
       case None =>
-        Future(obtainMessageFileId(messageWithImage)).flatMap(readTelegramFile)
+        Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
           .map(sendEverypixelRequest).flatMap(replyWithRating)
           .recoverWith(handleError(messageWithImageAsCausal, "rating request"))
     }

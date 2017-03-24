@@ -1,6 +1,6 @@
 package nya.kitsunyan.littlechenbot.command
 
-import info.mukel.telegrambot4s.methods.GetFile
+import info.mukel.telegrambot4s.methods.{GetFile, ParseMode}
 import info.mukel.telegrambot4s.models.Message
 import nya.kitsunyan.littlechenbot.Utils
 
@@ -30,12 +30,13 @@ trait ExtractImage extends Command with Http {
     }
   }
 
-  def obtainMessageFileId(messageWithImage: Option[Message]): String = {
+  def obtainMessageFileId(command: String, messageWithImage: Option[Message]): String = {
     messageWithImage.flatMap(extractFileId) match {
       case Some(fileId) => fileId
       case None =>
-        throw new CommandException("Please reply to message with image or send image with command in caption.\n" +
-          "Remember I can't see other bots' messages even when you reply them!")
+        throw new CommandException("Please reply to message with image or send image with command in caption.\n\n" +
+          "Remember I can't see other bots' messages even when you reply them!\n\n" +
+          s"Type `/$command --help` for more information.", Some(ParseMode.Markdown))
     }
   }
 
@@ -62,7 +63,7 @@ trait ExtractImage extends Command with Http {
   def handleError(causalMessage: Message, kind: String)(implicit message: Message):
     PartialFunction[Throwable, Future[Message]] = {
     case e: CommandException =>
-      replyQuote(e.getMessage)
+      replyQuote(e.getMessage, e.parseMode)
     case e: Exception =>
       handleException(e, causalMessage)
       replyQuote(s"An exception was thrown during $kind.")
