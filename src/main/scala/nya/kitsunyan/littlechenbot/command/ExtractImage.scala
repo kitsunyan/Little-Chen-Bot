@@ -8,8 +8,12 @@ import scala.concurrent.Future
 import scalaj.http.MultiPart
 
 trait ExtractImage extends Command with Http {
-  def extractMessageWithImage(message: Message): Option[Message] = {
+  def messageWithImage(implicit message: Message): Option[Message] = {
     message.caption.map(_ => message) orElse message.replyToMessage
+  }
+
+  def messageWithImageAsCausal(implicit message: Message): Message = {
+    messageWithImage.getOrElse(message)
   }
 
   def extractFileId(message: Message): Option[String] = {
@@ -26,8 +30,8 @@ trait ExtractImage extends Command with Http {
     }
   }
 
-  def obtainMessageFileId(implicit message: Message): String = {
-    extractMessageWithImage(message).flatMap(extractFileId) match {
+  def obtainMessageFileId(messageWithImage: Option[Message]): String = {
+    messageWithImage.flatMap(extractFileId) match {
       case Some(fileId) => fileId
       case None =>
         throw new CommandException("Please reply to message with image or send image with command in caption.\n" +
@@ -55,11 +59,12 @@ trait ExtractImage extends Command with Http {
     }
   }
 
-  def handleError(kind: String)(implicit message: Message): PartialFunction[Throwable, Future[Message]] = {
+  def handleError(causalMessage: Message, kind: String)(implicit message: Message):
+    PartialFunction[Throwable, Future[Message]] = {
     case e: CommandException =>
       replyQuote(e.getMessage)
     case e: Exception =>
-      handleException(e)
+      handleException(e, causalMessage)
       replyQuote(s"An exception was thrown during $kind.")
   }
 }

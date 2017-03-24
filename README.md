@@ -18,7 +18,8 @@ You should create `littlechenbot.conf` in the project directory.
 Available properties:
 
 * `bot.token` — Telegram API token (String, required)
-* `bot.chats` — List of allowed chatIDs (list of Long values, optional)
+* `bot.owner` — Bot owner ID to log errors (Long, optional)
+* `bot.chats` — List of allowed chat IDs (list of Long values, optional)
 * `bot.chatsAnyPrivate` — Allows to reply to all private chats (Boolean, optional)
 * `bot.chatsAnyGroup` — Allows to reply to all group chats (Boolean, optional)
 

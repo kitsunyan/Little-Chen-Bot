@@ -55,8 +55,9 @@ trait RateCommand extends Command with ExtractImage with Http {
         replyQuote("Rate image using everypixel.com." +
           "\n\n" +" -h, --help — display this help.")
       case None =>
-        Future(obtainMessageFileId).flatMap(readTelegramFile).map(sendEverypixelRequest)
-          .flatMap(replyWithRating).recoverWith(handleError("rating request"))
+        Future(obtainMessageFileId(messageWithImage)).flatMap(readTelegramFile)
+          .map(sendEverypixelRequest).flatMap(replyWithRating)
+          .recoverWith(handleError(messageWithImageAsCausal, "rating request"))
     }
   }
 }

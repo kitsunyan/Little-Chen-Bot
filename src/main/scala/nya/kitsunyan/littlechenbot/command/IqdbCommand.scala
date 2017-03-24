@@ -117,7 +117,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
       result.successImageData.getOrElse {
         val notFoundMessage = result.exception.map { e =>
-          handleException(e)
+          handleException(e, messageWithImageAsCausal)
           "No images found (due to exception thrown)."
         }.getOrElse("No images found.")
 
@@ -163,9 +163,9 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         val priority = arguments.string("p", "priority")
           .map(_.split(",|\\s+").toList.filter(!_.isEmpty)).getOrElse(Nil)
 
-        Future(obtainMessageFileId).flatMap(readTelegramFile)
+        Future(obtainMessageFileId(messageWithImage)).flatMap(readTelegramFile)
           .map(sendIqdbRequest(similarity)).map(applyPriority(priority)).map(readBooruImages)
-          .flatMap(replyWithImage).recoverWith(handleError("image request"))
+          .flatMap(replyWithImage).recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }
   }
 }

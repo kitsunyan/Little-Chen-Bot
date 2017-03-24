@@ -12,7 +12,7 @@ trait Command extends BotBase with AkkaDefaults {
 
   def filterChat(message: Message): Boolean = true
 
-  def handleException(e: Throwable): Unit
+  def handleException(e: Throwable, causalMessage: Message): Unit
 
   class Arguments(data: String) {
     private def parseArguments(data: String): Map[String, String] = {

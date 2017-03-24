@@ -1,5 +1,7 @@
 package nya.kitsunyan.littlechenbot
 
+import java.io.{PrintWriter, StringWriter}
+
 import com.typesafe.config._
 
 import info.mukel.telegrambot4s.api._
@@ -14,11 +16,11 @@ import scalaj.http._
 object BotApplication extends App {
   private val config = ConfigFactory.parseFile(new java.io.File("littlechenbot.conf"))
 
-  private def config[T](getter: String => T, key: String, fallback: T): T = {
+  private def config[T](getter: String => T, key: String): Option[T] = {
     try {
-      getter(key)
+      Some(getter(key))
     } catch {
-      case _: ConfigException => fallback
+      case _: ConfigException => None
     }
   }
 
@@ -26,9 +28,10 @@ object BotApplication extends App {
     override def token: String = config.getString("bot.token")
     override val botNickname: Future[String] = request(GetMe).map(_.username.getOrElse(""))
 
-    private val chats = config(config.getLongList, "bot.chats", java.util.Collections.emptyList)
-    private val chatsAnyPrivate = config(config.getBoolean, "bot.chatsAnyPrivate", false)
-    private val chatsAnyGroup = config(config.getBoolean, "bot.chatsAnyGroup", false)
+    private val botOwner = config(config.getLong, "bot.owner")
+    private val chats = config(config.getLongList, "bot.chats").getOrElse(java.util.Collections.emptyList)
+    private val chatsAnyPrivate = config(config.getBoolean, "bot.chatsAnyPrivate").getOrElse(false)
+    private val chatsAnyGroup = config(config.getBoolean, "bot.chatsAnyGroup").getOrElse(false)
     private val startTime = System.currentTimeMillis / 1000
 
     override def filterChat(message: Message): Boolean = {
@@ -37,8 +40,17 @@ object BotApplication extends App {
         chatsAnyGroup && Set("group", "supergroup").contains(message.chat.`type`))
     }
 
-    override def handleException(e: Throwable): Unit = {
+    override def handleException(e: Throwable, causalMessage: Message): Unit = {
       e.printStackTrace()
+      botOwner.map { botOwner =>
+        request(ForwardMessage(Left(botOwner), Left(causalMessage.chat.id),
+          Some(true), causalMessage.messageId)).flatMap { sentMessage =>
+          val writer = new StringWriter()
+          e.printStackTrace(new PrintWriter(writer))
+          request(SendMessage(Left(botOwner), "```\n" + writer.toString + "\n```", Some(ParseMode.Markdown),
+            Some(true), Some(true), Some(sentMessage.messageId)))
+        }
+      }
     }
 
     override def http(url: String, proxy: Boolean): HttpRequest = {
