@@ -133,7 +133,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           val serviceName = iqdbResult.booruService.displayName
           val similarity = iqdbResult.similarity
           s"$similarity% — $serviceName"
-        }.foldLeft((1, "")) { (tuple, value) =>
+        }.foldLeft(1, "") { (tuple, value) =>
           val (count, result) = tuple
           (count + 1, result + s"\n$count: $value")
         }
@@ -217,6 +217,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           "Reset all default arguments. Can be used with `--configure` argument only.") ::
         (List("--example"), None,
           "Print examples of usage.") ::
+        (List("--list"), None,
+          "Print all supported \\*booru services.") ::
         (List("-h", "--help"), None,
           "Display this help.") ::
         Nil)
@@ -243,6 +245,13 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         "\n    `/iqdb -c --reset`" +
         "\n    `/iqdb -c --reset -s 50`",
         Some(ParseMode.Markdown))
+    } else if (arguments.string(null, "list").nonEmpty) {
+      replyQuote("Supported \\*booru services:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
+        val primaryDomain = v.aliases.find(_.primaryDomain).get.name
+        val aliases = v.aliases.filter(!_.primaryDomain).map(_.name).reduce(_ + "_, _" + _)
+        val aliasesText = if (aliases.isEmpty) "" else s" (aliases: _${aliases}_)"
+        (i + 1, s"$a\n$i: $primaryDomain$aliasesText")
+      }._2, Some(ParseMode.Markdown))
     } else if (arguments.string("c", "configure").nonEmpty) {
       val reset = arguments.string(null, "reset")
 

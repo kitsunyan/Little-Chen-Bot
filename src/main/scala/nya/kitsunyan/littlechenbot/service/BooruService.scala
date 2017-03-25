@@ -13,7 +13,7 @@ sealed trait BooruService {
   }
 
   def displayName: String = {
-    aliases.map(_.name).head
+    aliases.find(_.primaryName).get.name
   }
 
   def replaceDomain(url: String, alias: String): String = {
@@ -28,7 +28,8 @@ sealed trait BooruService {
     }.getOrElse(url)
   }
 
-  case class Alias(name: String, replaceDomain: Boolean)
+  case class Alias(name: String, primaryName: Boolean = false,
+    primaryDomain: Boolean = false, replaceDomain: Boolean = false)
 }
 
 object BooruService {
@@ -46,9 +47,9 @@ object BooruService {
 object DanbooruService extends BooruService {
   override val iqdbId: String = "1"
   override val aliases: List[Alias] =
-    Alias("danbooru", false) ::
-    Alias("danbooru.donmai.us", false) ::
-    Alias("hijiribe.donmai.us", true) ::
+    Alias("danbooru", primaryName = true) ::
+    Alias("danbooru.donmai.us", primaryDomain = true) ::
+    Alias("hijiribe.donmai.us", replaceDomain = true) ::
     Nil
 
   override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
@@ -73,8 +74,8 @@ object DanbooruService extends BooruService {
 object YandereService extends BooruService {
   override val iqdbId: String = "3"
   override val aliases: List[Alias] =
-    Alias("yandere", false) ::
-    Alias("yande.re", false) ::
+    Alias("yandere", primaryName = true) ::
+    Alias("yande.re", primaryDomain = true) ::
     Nil
 
   override def filterUrl(url: String): Boolean = url.contains("//yande.re")
@@ -96,8 +97,8 @@ object YandereService extends BooruService {
 object GelbooruService extends BooruService {
   override val iqdbId: String = "4"
   override val aliases: List[Alias] =
-    Alias("gelbooru", false) ::
-    Alias("gelbooru.com", false) ::
+    Alias("gelbooru", primaryName = true) ::
+    Alias("gelbooru.com", primaryDomain = true) ::
     Nil
 
   override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
