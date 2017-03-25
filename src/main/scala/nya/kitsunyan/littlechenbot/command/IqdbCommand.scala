@@ -204,66 +204,63 @@ trait IqdbCommand extends Command with ExtractImage with Http {
     val priorityOption = arguments.string("p", "priority")
       .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
 
-    (arguments.string("h", "help"),
-      arguments.string(null, "example"),
-      arguments.string("c", "configure")) match {
-      case (Some(_), _, _) =>
-        replyMan("Fetch image from \\*booru using iqdb.org.",
-          (List("-s", "--min-similarity"), Some("0-100"),
-            "Set minimum allowed similarity for found images.") ::
-          (List("-p", "--priority"), Some("string list"),
-            "Set priority for \\*booru services.") ::
-          (List("-c", "--configure"), None,
-            "Set default arguments for user. Specified `--priority` and `--min-similarity` " +
-            "arguments will be stored as default.") ::
-          (List("--reset"), None,
-            "Reset all default arguments. Can be used with `--configure` argument only.") ::
-          (List("--example"), None,
-            "Print examples of usage.") ::
-          (List("-h", "--help"), None,
-            "Display this help.") ::
-          Nil)
-      case (_, Some(_), _) =>
-        replyQuote("Examples of usage:" +
-          "\n\nFetch first image with similarity >= 50%:" +
-          "\n    `/iqdb --min-similarity 50`" +
-          "\n    `/iqdb -s 50`" +
-          "\n\nFetch first image from danbooru if possible:" +
-          "\n    `/iqdb --priority danbooru`" +
-          "\n    `/iqdb -p danbooru`" +
-          "\n\nFetch first image from danbooru or gelbooru if possible:" +
-          "\n    `/iqdb -p \"danbooru gelbooru\"`" +
-          "\n\nFetch first image from danbooru with similarity >= 50%:" +
-          "\n    `/iqdb -p danbooru -s 50`" +
-          "\n\nView configuration:" +
-          "\n    `/iqdb --configure`" +
-          "\n    `/iqdb -c`" +
-          "\n\nUpdate configuration:" +
-          "\n    `/iqdb -c -s 50`" +
-          "\n    `/iqdb -c -p \"danbooru gelbooru\"`" +
-          "\n    `/iqdb -c -s 40 -p danbooru`" +
-          "\n\nReset configuration:" +
-          "\n    `/iqdb -c --reset`" +
-          "\n    `/iqdb -c --reset -s 50`",
-          Some(ParseMode.Markdown))
-      case (_, _, Some(_)) =>
-        val reset = arguments.string(null, "reset")
+    if (arguments.string("h", "help").nonEmpty) {
+      replyMan("Fetch image from \\*booru using iqdb.org.",
+        (List("-s", "--min-similarity"), Some("0-100"),
+          "Set minimum allowed similarity for found images.") ::
+        (List("-p", "--priority"), Some("string list"),
+          "Set priority for \\*booru services.") ::
+        (List("-c", "--configure"), None,
+          "Set default arguments for user. Specified `--priority` and `--min-similarity` " +
+          "arguments will be stored as default.") ::
+        (List("--reset"), None,
+          "Reset all default arguments. Can be used with `--configure` argument only.") ::
+        (List("--example"), None,
+          "Print examples of usage.") ::
+        (List("-h", "--help"), None,
+          "Display this help.") ::
+        Nil)
+    } else if (arguments.string(null, "example").nonEmpty) {
+      replyQuote("Examples of usage:" +
+        "\n\nFetch first image with similarity >= 50%:" +
+        "\n    `/iqdb --min-similarity 50`" +
+        "\n    `/iqdb -s 50`" +
+        "\n\nFetch first image from danbooru if possible:" +
+        "\n    `/iqdb --priority danbooru`" +
+        "\n    `/iqdb -p danbooru`" +
+        "\n\nFetch first image from danbooru or gelbooru if possible:" +
+        "\n    `/iqdb -p \"danbooru gelbooru\"`" +
+        "\n\nFetch first image from danbooru with similarity >= 50%:" +
+        "\n    `/iqdb -p danbooru -s 50`" +
+        "\n\nView configuration:" +
+        "\n    `/iqdb --configure`" +
+        "\n    `/iqdb -c`" +
+        "\n\nUpdate configuration:" +
+        "\n    `/iqdb -c -s 50`" +
+        "\n    `/iqdb -c -p \"danbooru gelbooru\"`" +
+        "\n    `/iqdb -c -s 40 -p danbooru`" +
+        "\n\nReset configuration:" +
+        "\n    `/iqdb -c --reset`" +
+        "\n    `/iqdb -c --reset -s 50`",
+        Some(ParseMode.Markdown))
+    } else if (arguments.string("c", "configure").nonEmpty) {
+      val reset = arguments.string(null, "reset")
 
-        message.from.map(_.id.toLong).map { userId =>
-          IqdbConfigurationData.get(userId)
-            .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
-            .flatMap((storeConfiguration _).tupled).map(printConfiguration)
-            .recoverWith(handleError(message, "configuration handling"))
-        }
-      case _ =>
-        val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
-        val priority = getConfiguration(priorityOption, _.priority, Nil)
+      message.from.map(_.id.toLong).map { userId =>
+        IqdbConfigurationData.get(userId)
+          .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
+          .flatMap((storeConfiguration _).tupled).map(printConfiguration)
+          .recoverWith(handleError(message, "configuration handling"))
+      }
+    } else {
+      val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
+      val priority = getConfiguration(priorityOption, _.priority, Nil)
 
-        Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
-          .flatMap(withConfiguration(sendIqdbRequest, similarity))
-          .flatMap(withConfiguration(applyPriority, priority))
-          .map(readBooruImages).flatMap(replyWithImage)
-          .recoverWith(handleError(messageWithImageAsCausal, "image request"))
+      Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
+        .flatMap(withConfiguration(sendIqdbRequest, similarity))
+        .flatMap(withConfiguration(applyPriority, priority))
+        .map(readBooruImages).flatMap(replyWithImage)
+        .recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }
   }
 }

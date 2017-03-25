@@ -52,16 +52,15 @@ trait RateCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.replyToMessage.getOrElse(message).messageId)))
     }
 
-    arguments.string("h", "help") match {
-      case Some(_) =>
-        replyMan("Rate image using everypixel.com.",
-          (List("-h", "--help"), None,
-            "Display this help.") ::
-          Nil)
-      case None =>
-        Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
-          .map(sendEverypixelRequest).flatMap(replyWithRating)
-          .recoverWith(handleError(messageWithImageAsCausal, "rating request"))
+    if (arguments.string("h", "help").nonEmpty) {
+      replyMan("Rate image using everypixel.com.",
+        (List("-h", "--help"), None,
+          "Display this help.") ::
+        Nil)
+    } else {
+      Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
+        .map(sendEverypixelRequest).flatMap(replyWithRating)
+        .recoverWith(handleError(messageWithImageAsCausal, "rating request"))
     }
   }
 }
