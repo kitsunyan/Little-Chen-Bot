@@ -4,13 +4,31 @@ import scala.util.matching.Regex
 
 sealed trait BooruService {
   val iqdbId: String
-  val commonNames: List[String]
+  val aliases: List[Alias]
   def filterUrl(url: String): Boolean
   def parseHtml(html: String): Option[(String, Set[String], Set[String], Set[String])]
 
   protected def collectSet(content: String, regex: Regex): Set[String] = {
     regex.findAllIn(content).matchData.map(_.subgroups.head).toSet
   }
+
+  def displayName: String = {
+    aliases.map(_.name).head
+  }
+
+  def replaceDomain(url: String, alias: String): String = {
+    aliases.filter(_.replaceDomain).map(_.name).find(_ == alias).flatMap { domain =>
+      val index1 = url.indexOf("://")
+      val index2 = if (index1 >= 0) url.indexOf('/', index1 + 3) else -1
+      if (index2 >= index1) {
+        Some(url.substring(0, index1 + 3) + domain + url.substring(index2))
+      } else {
+        None
+      }
+    }.getOrElse(url)
+  }
+
+  case class Alias(name: String, replaceDomain: Boolean)
 }
 
 object BooruService {
@@ -21,13 +39,17 @@ object BooruService {
   }
 
   def findByName(name: String): Option[BooruService] = {
-    list.find(_.commonNames.contains(name.toLowerCase))
+    list.find(_.aliases.map(_.name).contains(name.toLowerCase))
   }
 }
 
 object DanbooruService extends BooruService {
   override val iqdbId: String = "1"
-  override val commonNames: List[String] = List("danbooru", "danbooru.donmai.us")
+  override val aliases: List[Alias] =
+    Alias("danbooru", false) ::
+    Alias("danbooru.donmai.us", false) ::
+    Alias("hijiribe.donmai.us", true) ::
+    Nil
 
   override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
 
@@ -50,7 +72,10 @@ object DanbooruService extends BooruService {
 
 object YandereService extends BooruService {
   override val iqdbId: String = "3"
-  override val commonNames: List[String] = List("yandere", "yande.re")
+  override val aliases: List[Alias] =
+    Alias("yandere", false) ::
+    Alias("yande.re", false) ::
+    Nil
 
   override def filterUrl(url: String): Boolean = url.contains("//yande.re")
 
@@ -70,7 +95,10 @@ object YandereService extends BooruService {
 
 object GelbooruService extends BooruService {
   override val iqdbId: String = "4"
-  override val commonNames: List[String] = List("gelbooru", "gelbooru.com")
+  override val aliases: List[Alias] =
+    Alias("gelbooru", false) ::
+    Alias("gelbooru.com", false) ::
+    Nil
 
   override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
 

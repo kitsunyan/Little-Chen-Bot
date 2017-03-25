@@ -17,7 +17,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Unit = {
-    case class IqdbResult(url: String, booruService: BooruService, similarity: Int, matches: Boolean)
+    case class IqdbResult(url: String, booruService: BooruService,
+      alias: Option[String], similarity: Int, matches: Boolean)
 
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
       http("https://iqdb.org/")
@@ -38,12 +39,17 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           matches = similarity >= minSimilarity
           booruService = BooruService.findByUrl(url)
           if booruService.nonEmpty
-        } yield IqdbResult(url, booruService.get, similarity, matches)).toList
+        } yield IqdbResult(url, booruService.get, None, similarity, matches)).toList
       }
     }
 
     def applyPriority(priority: List[String])(iqdbResults: List[IqdbResult]): List[IqdbResult] = {
-      val servicesPriority = priority.flatMap(BooruService.findByName)
+      // Priority equality depends on BooruService equality
+      case class Priority(booruService: BooruService)(val alias: String)
+
+      val distinctPriority = priority.flatMap(p => BooruService.findByName(p).map(Priority(_)(p))).distinct
+      val priorityMap = distinctPriority.map(p => p.booruService -> p.alias).toMap
+      val servicesPriority = distinctPriority.map(_.booruService)
 
       iqdbResults.sortWith { (a, b) =>
         val aindex = servicesPriority.indexOf(a.booruService)
@@ -59,21 +65,29 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         } else {
           a.similarity > b.similarity
         }
+      }.map(r => r.copy(alias = priorityMap.get(r.booruService)))
+    }
+
+    case class ImageData(url: String)(val pageUrlFunction: () => String,
+      val characters: Set[String], val copyrights: Set[String], val artists: Set[String])
+
+    case class ReadImageData(name: String, image: Array[Byte])(pageUrlFunction: () => String,
+      val characters: Set[String], val copyrights: Set[String], val artists: Set[String]) {
+      def pageUrl: String = {
+        pageUrlFunction()
       }
     }
 
-    case class ImageData(url: String, pageUrl: String,
-      characters: Set[String], copyrights: Set[String], artists: Set[String])
-
-    case class ReadImageData(name: String, image: Array[Byte], pageUrl: String,
-      characters: Set[String], copyrights: Set[String], artists: Set[String])
-
     def readBooruPage(iqdbResult: IqdbResult): ImageData = {
       val pageUrl = iqdbResult.url
+      val pageUrlFunction = () => iqdbResult.alias
+        .map(iqdbResult.booruService.replaceDomain(pageUrl, _))
+        .getOrElse(pageUrl)
+
       http(pageUrl, proxy = true).response(_.asString) { _ => body =>
         iqdbResult.booruService.parseHtml(body) match {
           case Some((url, characters, copyrights, artists)) =>
-            ImageData(url, pageUrl, characters, copyrights, artists)
+            ImageData(url)(pageUrlFunction, characters, copyrights, artists)
           case None => throw new Exception(s"Not parsed: $pageUrl.")
         }
       }
@@ -88,7 +102,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           if (end >= start) url.substring(start, end) else url.substring(start)
         }
 
-        ReadImageData(name, body, imageData.pageUrl,
+        ReadImageData(name, body)(imageData.pageUrlFunction,
           imageData.characters, imageData.copyrights, imageData.artists)
       }
     }
@@ -116,7 +130,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         }.getOrElse("No images found.")
 
         val (_, additionalResults) = result.additionalIqdbResults.reverse.map { iqdbResult =>
-          val serviceName = iqdbResult.booruService.commonNames.head
+          val serviceName = iqdbResult.booruService.displayName
           val similarity = iqdbResult.similarity
           s"$similarity% — $serviceName"
         }.foldLeft((1, "")) { (tuple, value) =>
