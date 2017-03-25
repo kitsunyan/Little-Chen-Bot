@@ -10,13 +10,11 @@ import scala.concurrent.Future
 trait IqdbCommand extends Command with ExtractImage with Http {
   private val commands = List("iqdb")
 
-  override def handleMessage(implicit message: Message): Unit = {
-    filterMessage(commands)
-      .map(handleMessageInternal)
-      .getOrElse(super.handleMessage)
+  override def handleMessage(implicit message: Message): Future[_] = {
+    filterMessage(commands, handleMessageInternal, super.handleMessage)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Unit = {
+  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[_] = {
     case class IqdbResult(url: String, booruService: BooruService,
       alias: Option[String], similarity: Int, matches: Boolean)
 
@@ -260,7 +258,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
           .recoverWith(handleError(message, "configuration handling"))
-      }
+      }.getOrElse(Future {})
     } else {
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)

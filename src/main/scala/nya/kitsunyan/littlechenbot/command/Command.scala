@@ -5,8 +5,7 @@ import info.mukel.telegrambot4s.methods.ParseMode.ParseMode
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
-import scala.concurrent.duration.Duration
-import scala.concurrent._
+import scala.concurrent.Future
 
 trait Command extends BotBase with AkkaDefaults {
   val botNickname: Future[String]
@@ -80,11 +79,12 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  final def filterMessage(command: String)(implicit message: Message): Option[Arguments] = {
-    if (filterChat(message)) {
-      (message.text orElse message.caption).flatMap { text =>
+  private def filterCommands(commands: List[String], botNickname: String)(text: String): Option[Arguments] = {
+    commands.foldLeft[Option[Arguments]](None) { (a, command) =>
+      a orElse {
         val shortCommand = "/" + command
-        val longCommand = shortCommand + "@" + Await.result(botNickname, Duration.Inf)
+        val longCommand = shortCommand + "@" + botNickname
+
         Seq(shortCommand, longCommand).map { fullCommand =>
           if (text.equals(fullCommand)) {
             Some("")
@@ -95,20 +95,23 @@ trait Command extends BotBase with AkkaDefaults {
           }
         }.reduceLeft(_ orElse _).map(new Arguments(_))
       }
-    } else {
-      None
     }
   }
 
-  final def filterMessage(commands: List[String])(implicit message: Message): Option[Arguments] = {
-    commands.foldLeft[Option[Arguments]](None)(_ orElse filterMessage(_))
+  final def filterMessage(commands: List[String], success: Arguments => Future[_], fail: => Future[_])
+    (implicit message: Message): Future[_] = {
+    botNickname.flatMap { botNickname =>
+      (if (filterChat(message)) message.text orElse message.caption else None)
+        .flatMap(filterCommands(commands, botNickname))
+        .map(success).getOrElse(fail)
+    }
   }
 
   class CommandException(message: String, val parseMode: Option[ParseMode] = None) extends Exception(message)
 
   final override def onMessage(message: Message): Unit = handleMessage(message)
 
-  def handleMessage(implicit message: Message): Unit = ()
+  def handleMessage(implicit message: Message): Future[_] = Future {}
 
   def replyQuote(text: String, parseMode: Option[ParseMode] = None)(implicit message: Message): Future[Message] = {
     request(SendMessage(Left(message.sender), text, parseMode, replyToMessageId = Some(message.messageId)))
