@@ -2,7 +2,7 @@ package nya.kitsunyan.littlechenbot.command
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
-
+import nya.kitsunyan.littlechenbot.database.IqdbConfigurationData
 import nya.kitsunyan.littlechenbot.service.BooruService
 
 import scala.concurrent.Future
@@ -143,19 +143,73 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         replyToMessageId = Some(message.messageId), caption = captionOption))
     }
 
-    (arguments.string("h", "help"), arguments.string(null, "example")) match {
-      case (Some(_), _) =>
+    def configureItem(userId: Long, minSimilarity: Option[Int], priority: Option[List[String]], reset: Boolean)
+      (item: Option[IqdbConfigurationData.Item]): (IqdbConfigurationData.Item, Boolean) = {
+      val oldItem = (if (reset) None else item).getOrElse(IqdbConfigurationData.Item(userId, None, None))
+      val newItem = oldItem.copy(minSimilarity = minSimilarity orElse oldItem.minSimilarity,
+        priority = priority orElse oldItem.priority)
+      (newItem, newItem != oldItem || item.exists(_ != newItem))
+    }
+
+    def storeConfiguration(item: IqdbConfigurationData.Item, update: Boolean): Future[IqdbConfigurationData.Item] = {
+      if (update) {
+        (item.minSimilarity orElse item.priority)
+          .map(_ => IqdbConfigurationData.set(item))
+          .getOrElse(IqdbConfigurationData.delete(item.userId))
+          .map(_ => item)
+      } else {
+        Future {item}
+      }
+    }
+
+    def printConfiguration(item: IqdbConfigurationData.Item): Future[Message] = {
+      val minSimilarity = item.minSimilarity.map(_.toString).getOrElse("_default_")
+      val priority = item.priority.map(_.reduce(_ + ", " + _).replaceAll("[`*_\\[\\]()]", "")).getOrElse("_default_")
+      replyQuote("Current configuration:\n" +
+        s"\n`--min-similarity`: $minSimilarity" +
+        s"\n`--priority`: $priority", Some(ParseMode.Markdown))
+    }
+
+    def getConfiguration[T](argument: Option[T], callback: IqdbConfigurationData.Item => Option[T],
+      default: T): Future[T] = {
+      argument.map(v => Future {v}).getOrElse {
+        message.from.map(_.id.toLong)
+          .map(IqdbConfigurationData.get)
+          .map(_.map(_.flatMap(callback).getOrElse(default)))
+          .getOrElse(Future {default})
+      }
+    }
+
+    def withConfiguration[A, B, C](next: B => A => C, future: Future[B])(value: A): Future[C] = {
+      future.map(next).map(_(value))
+    }
+
+    val similarityOption = arguments.int("s", "min-similarity")
+      .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
+
+    val priorityOption = arguments.string("p", "priority")
+      .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
+
+    (arguments.string("h", "help"),
+      arguments.string(null, "example"),
+      arguments.string("c", "configure")) match {
+      case (Some(_), _, _) =>
         replyMan("Fetch image from \\*booru using iqdb.org.",
           (List("-s", "--min-similarity"), Some("0-100"),
             "Set minimum allowed similarity for found images.") ::
           (List("-p", "--priority"), Some("string list"),
             "Set priority for \\*booru services.") ::
+          (List("-c", "--configure"), None,
+            "Set default arguments for user. Specified `--priority` and `--min-similarity` " +
+            "arguments will be stored as default.") ::
+          (List("--reset"), None,
+            "Reset all default arguments. Can be used with `--configure` argument only.") ::
           (List("--example"), None,
             "Print examples of usage.") ::
           (List("-h", "--help"), None,
             "Display this help.") ::
           Nil)
-      case (_, Some(_)) =>
+      case (_, Some(_), _) =>
         replyQuote("Examples of usage:" +
           "\n\nFetch first image with similarity >= 50%:" +
           "\n    `/iqdb --min-similarity 50`" +
@@ -166,19 +220,36 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           "\n\nFetch first image from danbooru or gelbooru if possible:" +
           "\n    `/iqdb -p \"danbooru gelbooru\"`" +
           "\n\nFetch first image from danbooru with similarity >= 50%:" +
-          "\n    `/iqdb -p danbooru -s 50`",
+          "\n    `/iqdb -p danbooru -s 50`" +
+          "\n\nView configuration:" +
+          "\n    `/iqdb --configure`" +
+          "\n    `/iqdb -c`" +
+          "\n\nUpdate configuration:" +
+          "\n    `/iqdb -c -s 50`" +
+          "\n    `/iqdb -c -p \"danbooru gelbooru\"`" +
+          "\n    `/iqdb -c -s 40 -p danbooru`" +
+          "\n\nReset configuration:" +
+          "\n    `/iqdb -c --reset`" +
+          "\n    `/iqdb -c --reset -s 50`",
           Some(ParseMode.Markdown))
-      case _ =>
-        val similarity = arguments.int("s", "min-similarity")
-          .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
-          .getOrElse(70)
+      case (_, _, Some(_)) =>
+        val reset = arguments.string(null, "reset")
 
-        val priority = arguments.string("p", "priority")
-          .map(_.split(",|\\s+").toList.filter(!_.isEmpty)).getOrElse(Nil)
+        message.from.map(_.id.toLong).map { userId =>
+          IqdbConfigurationData.get(userId)
+            .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
+            .flatMap((storeConfiguration _).tupled).map(printConfiguration)
+            .recoverWith(handleError(message, "configuration handling"))
+        }
+      case _ =>
+        val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
+        val priority = getConfiguration(priorityOption, _.priority, Nil)
 
         Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
-          .map(sendIqdbRequest(similarity)).map(applyPriority(priority)).map(readBooruImages)
-          .flatMap(replyWithImage).recoverWith(handleError(messageWithImageAsCausal, "image request"))
+          .flatMap(withConfiguration(sendIqdbRequest, similarity))
+          .flatMap(withConfiguration(applyPriority, priority))
+          .map(readBooruImages).flatMap(replyWithImage)
+          .recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }
   }
 }
