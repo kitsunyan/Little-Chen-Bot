@@ -17,10 +17,10 @@ trait Command extends BotBase with AkkaDefaults {
   class Arguments(data: String) {
     private def parseArguments(data: String): Map[String, String] = {
       case class CharFold(quote: Boolean = false, escape: Boolean = false,
-        chars: List[Char] = List(), arguments: List[String] = List()) {
+        chars: List[Char] = Nil, arguments: List[String] = Nil) {
         def close(): CharFold = {
           if (chars.nonEmpty) {
-            copy(chars = List(), arguments = chars.reverse.mkString :: arguments)
+            copy(chars = Nil, arguments = chars.reverse.mkString :: arguments)
           } else {
             this
           }
