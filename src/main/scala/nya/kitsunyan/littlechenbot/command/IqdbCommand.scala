@@ -115,12 +115,12 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       }
     }
 
-    def readBooruImages(iqdbResults: List[IqdbResult]): ReadImageData = {
+    def readBooruImages(query: Boolean)(iqdbResults: List[IqdbResult]): ReadImageData = {
       case class Result(successImageData: Option[ReadImageData] = None,
         additionalIqdbResults: List[IqdbResult] = Nil, exception: Option[Exception] = None)
 
       val result = iqdbResults.foldLeft(Result()) { (result, iqdbResult) =>
-        if (result.successImageData.isEmpty && iqdbResult.matches) {
+        if (result.successImageData.isEmpty && iqdbResult.matches && !query) {
           try {
             result.copy(successImageData = Some(readBooruImage(readBooruPage(iqdbResult))))
           } catch {
@@ -146,6 +146,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
         if (additionalResults.isEmpty) {
           throw result.exception.getOrElse(new CommandException(s"$notFoundMessage"))
+        } else if (query) {
+          throw new CommandException(s"Results:$additionalResults")
         } else {
           throw new CommandException(s"$notFoundMessage\n\nAdditional results:$additionalResults")
         }
@@ -214,6 +216,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       replyMan("Fetch image from \\*booru using iqdb.org.",
         (List("-i", "--index"), Some("integer"),
           "Fetch image by specified index.") ::
+        (List("-q", "--query"), None,
+          "Query list of images without result.") ::
         (List("-s", "--min-similarity"), Some("0-100"),
           "Set minimum allowed similarity for found images.") ::
         (List("-p", "--priority"), Some("string list"),
@@ -235,6 +239,9 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         "\n\nFetch image by index:" +
         "\n    `/iqdb --index 2`" +
         "\n    `/iqdb -i 2`" +
+        "\n\nQuery list of images:" +
+        "\n    `/iqdb --query`" +
+        "\n    `/iqdb -q`" +
         "\n\nFetch first image with similarity >= 50%:" +
         "\n    `/iqdb --min-similarity 50`" +
         "\n    `/iqdb -s 50`" +
@@ -274,13 +281,14 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       }.getOrElse(Future {})
     } else {
       val indexOption = arguments.int("i", "index")
+      val query = arguments.string("q", "query").nonEmpty
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)
 
       Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
         .flatMap(withConfiguration(sendIqdbRequest, similarity))
         .flatMap(withConfiguration(applyPriority, priority))
-        .map(filterByIndex(indexOption)).map(readBooruImages).flatMap(replyWithImage)
+        .map(filterByIndex(indexOption)).map(readBooruImages(query)).flatMap(replyWithImage)
         .recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }
   }
