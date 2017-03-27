@@ -15,7 +15,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[_] = {
-    case class IqdbResult(url: String, booruService: BooruService,
+    case class IqdbResult(index: Int, url: String, booruService: BooruService,
       alias: Option[String], similarity: Int, matches: Boolean)
 
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
@@ -26,7 +26,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           "<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
 
-        (for {
+        val result = for {
           table <- tablePattern.findAllIn(body).matchData
           similarity = table.group(1).toInt
           links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
@@ -37,7 +37,11 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           matches = similarity >= minSimilarity
           booruService = BooruService.findByUrl(url)
           if booruService.nonEmpty
-        } yield IqdbResult(url, booruService.get, None, similarity, matches)).toList
+        } yield (url, booruService.get, similarity, matches)
+
+        result.foldLeft[List[IqdbResult]](Nil) { case ((list), (url, booruService, similarity, matches)) =>
+          IqdbResult(list.length, url, booruService, None, similarity, matches) :: list
+        }.reverse
       }
     }
 
@@ -64,6 +68,12 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           a.similarity > b.similarity
         }
       }.map(r => r.copy(alias = priorityMap.get(r.booruService)))
+    }
+
+    def filterByIndex(index: Option[Int])(iqdbResults: List[IqdbResult]): List[IqdbResult] = {
+      index.map(_ - 1).map(i => iqdbResults.find(_.index == i))
+        .map(_.map(_.copy(matches = true)).map(List(_)).getOrElse(Nil))
+        .getOrElse(iqdbResults)
     }
 
     case class ImageData(url: String)(val pageUrlFunction: () => String,
@@ -127,14 +137,12 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           "No images found (due to exception thrown)."
         }.getOrElse("No images found.")
 
-        val (_, additionalResults) = result.additionalIqdbResults.reverse.map { iqdbResult =>
+        val additionalResults = result.additionalIqdbResults.reverse.map { iqdbResult =>
+          val index = iqdbResult.index + 1
           val serviceName = iqdbResult.booruService.displayName
           val similarity = iqdbResult.similarity
-          s"$similarity% — $serviceName"
-        }.foldLeft(1, "") { (tuple, value) =>
-          val (count, result) = tuple
-          (count + 1, result + s"\n$count: $value")
-        }
+          s"$index: $similarity% — $serviceName"
+        }.foldLeft("")(_ + "\n" + _)
 
         if (additionalResults.isEmpty) {
           throw result.exception.getOrElse(new CommandException(s"$notFoundMessage"))
@@ -204,6 +212,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
     if (arguments.string("h", "help").nonEmpty) {
       replyMan("Fetch image from \\*booru using iqdb.org.",
+        (List("-i", "--index"), Some("integer"),
+          "Fetch image by specified index.") ::
         (List("-s", "--min-similarity"), Some("0-100"),
           "Set minimum allowed similarity for found images.") ::
         (List("-p", "--priority"), Some("string list"),
@@ -222,6 +232,9 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         Nil)
     } else if (arguments.string(null, "example").nonEmpty) {
       replyQuote("Examples of usage:" +
+        "\n\nFetch image by index:" +
+        "\n    `/iqdb --index 2`" +
+        "\n    `/iqdb -i 2`" +
         "\n\nFetch first image with similarity >= 50%:" +
         "\n    `/iqdb --min-similarity 50`" +
         "\n    `/iqdb -s 50`" +
@@ -260,13 +273,14 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           .recoverWith(handleError(message, "configuration handling"))
       }.getOrElse(Future {})
     } else {
+      val indexOption = arguments.int("i", "index")
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)
 
       Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
         .flatMap(withConfiguration(sendIqdbRequest, similarity))
         .flatMap(withConfiguration(applyPriority, priority))
-        .map(readBooruImages).flatMap(replyWithImage)
+        .map(filterByIndex(indexOption)).map(readBooruImages).flatMap(replyWithImage)
         .recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }
   }
