@@ -76,14 +76,11 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         .getOrElse(iqdbResults)
     }
 
-    case class ImageData(url: String)(val pageUrlFunction: () => String,
-      val characters: Set[String], val copyrights: Set[String], val artists: Set[String])
+    case class ImageData(url: String)(val pageUrlFunction: () => String, val tags: List[BooruService#Tag])
 
     case class ReadImageData(name: String, image: Array[Byte])(pageUrlFunction: () => String,
-      val characters: Set[String], val copyrights: Set[String], val artists: Set[String]) {
-      def pageUrl: String = {
-        pageUrlFunction()
-      }
+      val tags: List[BooruService#Tag]) {
+      def pageUrl: String = pageUrlFunction()
     }
 
     def readBooruPage(iqdbResult: IqdbResult): ImageData = {
@@ -94,8 +91,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
       http(pageUrl, proxy = true).response(_.asString) { _ => body =>
         iqdbResult.booruService.parseHtml(body) match {
-          case Some((url, characters, copyrights, artists)) =>
-            ImageData(url)(pageUrlFunction, characters, copyrights, artists)
+          case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new Exception(s"Not parsed: $pageUrl.")
         }
       }
@@ -110,8 +106,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           if (end >= start) url.substring(start, end) else url.substring(start)
         }
 
-        ReadImageData(name, body)(imageData.pageUrlFunction,
-          imageData.characters, imageData.copyrights, imageData.artists)
+        ReadImageData(name, body)(imageData.pageUrlFunction, imageData.tags)
       }
     }
 
@@ -154,15 +149,42 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       }
     }
 
-    def replyWithImage(imageData: ReadImageData): Future[Message] = {
-      def appendIterable(title: String, list: Iterable[String])(s: String): String = {
-        if (list.nonEmpty) s + s"\n$title: " + list.reduceLeft(_ + ", " + _) else s
+    def collectTags(short: Boolean, tags: List[BooruService#Tag]): Option[String] = {
+      def appendIterable(title: String, skip: Boolean, list: Iterable[BooruService#Tag],
+        filter: BooruService#Tag => Boolean)(s: String): String = {
+        val filteredList = list.filter(filter)
+        if (!skip && list.nonEmpty) {
+          val tags = (if (short) filteredList.take(3) else filteredList)
+            .map(_.title).reduce(_ + ", " + _)
+          val formatted = if (short) s"$title: $tags" else s"$title:\n$tags"
+          if (s.isEmpty) formatted else if (short) s"$s\n$formatted" else s"$s\n\n$formatted"
+        } else {
+          s
+        }
       }
 
-      val captionOption = Some(imageData.pageUrl).map(appendIterable("Characters", imageData.characters))
-        .map(appendIterable("Copyrights", imageData.copyrights)).map(appendIterable("Artists", imageData.artists))
+      Some("")
+        .map(appendIterable("Characters", false, tags, _.character))
+        .map(appendIterable("Copyrights", false, tags, _.copyright))
+        .map(appendIterable("Artists", false, tags, _.artist))
+        .map(appendIterable("Tags", short, tags, _.other))
+        .filter(_.nonEmpty)
+    }
+
+    def replyWithImage(displayTags: Boolean)(imageData: ReadImageData): Future[(ReadImageData, Message)] = {
+      val captionOption = (if (displayTags) collectTags(true, imageData.tags) else None)
+        .map(imageData.pageUrl + "\n" + _) orElse Some(imageData.pageUrl)
+
       request(SendDocument(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
         replyToMessageId = Some(message.messageId), caption = captionOption))
+        .map((imageData, _))
+    }
+
+    def replyWithTags(displayTags: Boolean)(imageData: ReadImageData, messageWithImage: Message):
+      Future[(ReadImageData, Message)] = {
+      (if (displayTags) collectTags(false, imageData.tags) else None)
+        .map(replyQuote(_)(messageWithImage).map((imageData, _)))
+        .getOrElse(Future { (imageData, messageWithImage) })
     }
 
     def configureItem(userId: Long, minSimilarity: Option[Int], priority: Option[List[String]], reset: Boolean)
@@ -218,6 +240,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           "Fetch image by specified index.") ::
         (List("-q", "--query"), None,
           "Query list of images without result.") ::
+        (List("-t", "--tags"), None,
+          "Attach a complete list of tags to reply.") ::
         (List("-s", "--min-similarity"), Some("0-100"),
           "Set minimum allowed similarity for found images.") ::
         (List("-p", "--priority"), Some("string list"),
@@ -242,6 +266,9 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         "\n\nQuery list of images:" +
         "\n    `/iqdb --query`" +
         "\n    `/iqdb -q`" +
+        "\n\nQuery image with tags:" +
+        "\n    `/iqdb --tags`" +
+        "\n    `/iqdb -t`" +
         "\n\nFetch first image with similarity >= 50%:" +
         "\n    `/iqdb --min-similarity 50`" +
         "\n    `/iqdb -s 50`" +
@@ -282,13 +309,15 @@ trait IqdbCommand extends Command with ExtractImage with Http {
     } else {
       val indexOption = arguments.int("i", "index")
       val query = arguments.string("q", "query").nonEmpty
+      val tags = arguments.string("t", "tags").nonEmpty
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)
 
       Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
         .flatMap(withConfiguration(sendIqdbRequest, similarity))
         .flatMap(withConfiguration(applyPriority, priority))
-        .map(filterByIndex(indexOption)).map(readBooruImages(query)).flatMap(replyWithImage)
+        .map(filterByIndex(indexOption)).map(readBooruImages(query))
+        .flatMap(replyWithImage(!tags)).flatMap((replyWithTags(tags) _).tupled)
         .recoverWith(handleError(messageWithImageAsCausal, "image request"))
     }
   }

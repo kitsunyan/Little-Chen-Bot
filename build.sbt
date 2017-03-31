@@ -4,6 +4,8 @@ version := "1.0"
 
 scalaVersion := "2.12.1"
 
+scalacOptions := Seq("-unchecked", "-deprecation", "-feature")
+
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += "info.mukel" %% "telegrambot4s" % "2.1.0-SNAPSHOT"
