@@ -9,7 +9,32 @@ Telegram bot that allows you to fetch images from iqdb.
 
 ## Building and Running
 
-Run `sbt run` to run bot and `sbt assembly` to build a standalone jar file.
+Run `sbt run` to run bot and `sbt proguard:proguard` to build a standalone jar file.
+
+### Build Configuration
+
+Build configuration is stored in `build.conf`.
+
+Available properties:
+
+* `solib.os` — List of supported OS (list of String values)
+* `solib.arch` — List of supported architectures (list of String values)
+
+With both `solib.os` and `solid.arch` properties provided, the final jar file will contain only `*.so` libraries for specified OS and architectures.
+
+Example configuration:
+
+```properties
+solib {
+    os = [
+        "Linux"
+    ]
+    arch = [
+        "x86_64",
+        "armv7"
+    ]
+}
+```
 
 ## Configuration
 

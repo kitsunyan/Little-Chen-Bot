@@ -16,9 +16,9 @@ import scalaj.http._
 object BotApplication extends App {
   private val config = ConfigFactory.parseFile(new java.io.File("littlechenbot.conf"))
 
-  private def config[T](getter: String => T, key: String): Option[T] = {
+  private def config[T](getter: Config => String => T, key: String): Option[T] = {
     try {
-      Some(getter(key))
+      Some(getter(config)(key))
     } catch {
       case _: ConfigException => None
     }
@@ -28,10 +28,10 @@ object BotApplication extends App {
     override def token: String = config.getString("bot.token")
     override val botNickname: Future[String] = request(GetMe).map(_.username.getOrElse(""))
 
-    private val botOwner = config(config.getLong, "bot.owner")
-    private val chats = config(config.getLongList, "bot.chats").getOrElse(java.util.Collections.emptyList)
-    private val chatsAnyPrivate = config(config.getBoolean, "bot.chatsAnyPrivate").getOrElse(false)
-    private val chatsAnyGroup = config(config.getBoolean, "bot.chatsAnyGroup").getOrElse(false)
+    private val botOwner = config(_.getLong, "bot.owner")
+    private val chats = config(_.getLongList, "bot.chats").getOrElse(java.util.Collections.emptyList)
+    private val chatsAnyPrivate = config(_.getBoolean, "bot.chatsAnyPrivate").getOrElse(false)
+    private val chatsAnyGroup = config(_.getBoolean, "bot.chatsAnyGroup").getOrElse(false)
     private val startTime = executionStart / 1000
 
     override def filterChat(message: Message): Boolean = {
