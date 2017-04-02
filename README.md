@@ -5,7 +5,6 @@ Telegram bot that allows you to fetch images from iqdb.
 ## Dependencies
 
 `libwebp` — Allows to convert WebP images to PNG.  
-`tor` — Bot uses Tor to access *booru servers.
 
 ## Building and Running
 
@@ -43,10 +42,13 @@ You should create `littlechenbot.conf` in the project directory.
 Available properties:
 
 * `bot.token` — Telegram API token (String, required)
-* `bot.owner` — Bot owner ID to log errors (Long, optional)
-* `bot.chats` — List of allowed chat IDs (list of Long values, optional)
-* `bot.chatsAnyPrivate` — Allows to reply to all private chats (Boolean, optional)
-* `bot.chatsAnyGroup` — Allows to reply to all group chats (Boolean, optional)
+* `bot.owner` — Bot owner ID to log errors (Long)
+* `bot.chats` — List of allowed chat IDs (list of Long values)
+* `bot.chatsAnyPrivate` — Allows to reply to all private chats (Boolean)
+* `bot.chatsAnyGroup` — Allows to reply to all group chats (Boolean)
+* `bot.proxy.host` — Proxy host (String)
+* `bot.proxy.port` — Proxy port (Int)
+* `bot.proxy.type` — Proxy type: http, socks, direct (String)
 
 Example configuration:
 
@@ -58,5 +60,10 @@ bot {
         83420754235, // Chat 1
         -4759243795 // Chat 2
     ]
+    proxy = {
+        host = "localhost"
+        port = 9050
+        type = "socks"
+    }
 }
 ```

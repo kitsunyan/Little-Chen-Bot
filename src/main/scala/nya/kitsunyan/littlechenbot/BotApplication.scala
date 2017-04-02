@@ -34,6 +34,14 @@ object BotApplication extends App {
     private val chatsAnyGroup = config(_.getBoolean, "bot.chatsAnyGroup").getOrElse(false)
     private val startTime = executionStart / 1000
 
+    private val proxy = {
+      for {
+        host <- config(_.getString, "bot.proxy.host")
+        port <- config(_.getInt, "bot.proxy.port")
+        typeString <- config(_.getString, "bot.proxy.type")
+      } yield (host, port, java.net.Proxy.Type.valueOf(typeString.toUpperCase))
+    }
+
     override def filterChat(message: Message): Boolean = {
       message.date >= startTime && (chats.contains(message.chat.id) ||
         chatsAnyPrivate && Set("private").contains(message.chat.`type`) ||
@@ -56,7 +64,9 @@ object BotApplication extends App {
     override def http(url: String, proxy: Boolean): HttpRequest = {
       Some(Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 10000)
         .option(HttpOptions.followRedirects(true))).map { request =>
-        if (proxy) request.proxy("localhost", 9050, java.net.Proxy.Type.SOCKS) else request
+        (if (proxy) ShikigamiBot.proxy else None)
+          .map((request.proxy(_: String, _: Int, _: java.net.Proxy.Type)).tupled)
+          .getOrElse(request)
       }.get
     }
   }
