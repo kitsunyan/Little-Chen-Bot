@@ -98,8 +98,8 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  final def filterMessage(commands: List[String], success: Arguments => Future[_], fail: => Future[_])
-    (implicit message: Message): Future[_] = {
+  final def filterMessage(commands: List[String], success: Arguments => Future[Any], fail: => Future[Any])
+    (implicit message: Message): Future[Any] = {
     botNickname.flatMap { botNickname =>
       (if (filterChat(message)) message.text orElse message.caption else None)
         .flatMap(filterCommands(commands, botNickname))
@@ -107,11 +107,13 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
+  class RecoverException(val future: Future[Any]) extends Exception
+
   class CommandException(message: String, val parseMode: Option[ParseMode] = None) extends Exception(message)
 
   final override def onMessage(message: Message): Unit = handleMessage(message)
 
-  def handleMessage(implicit message: Message): Future[_] = Future {}
+  def handleMessage(implicit message: Message): Future[Any] = Future {}
 
   def replyQuote(text: String, parseMode: Option[ParseMode] = None)(implicit message: Message): Future[Message] = {
     request(SendMessage(Left(message.sender), text, parseMode, replyToMessageId = Some(message.messageId)))

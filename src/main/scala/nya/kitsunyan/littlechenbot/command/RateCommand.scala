@@ -25,11 +25,11 @@ trait RateCommand extends Command with ExtractImage with Http {
     "CAADAgADxgEAAiX3NwgpkLZRMe1h0wI" ::
     Nil
 
-  override def handleMessage(implicit message: Message): Future[_] = {
+  override def handleMessage(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[_] = {
+  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
     def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
       http("https://services2.microstock.pro/aesthetics/quality")
         .postMulti(telegramFile.multiPart("data")).response(_.asString) { _ => body =>

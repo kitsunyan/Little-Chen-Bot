@@ -5,6 +5,8 @@ Telegram bot that allows you to fetch images from iqdb.
 ## Dependencies
 
 `libwebp` — Allows to convert WebP images to PNG.  
+`imagemagick` — Allows to transform and create images.  
+`fonts-roboto` — Font for images.  
 
 ## Building and Running
 

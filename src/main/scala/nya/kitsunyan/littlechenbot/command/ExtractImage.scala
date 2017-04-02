@@ -51,7 +51,7 @@ trait ExtractImage extends Command with Http {
           val data = {
             val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
             val data = http(telegramImageUrl).asBytes.body
-            if (path.endsWith(".webp")) Utils.webpToPng(data) else data
+            (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
           }
           val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
           TelegramFile(data, mimeType)
@@ -61,7 +61,9 @@ trait ExtractImage extends Command with Http {
   }
 
   def handleError(causalMessage: Message, kind: String)(implicit message: Message):
-    PartialFunction[Throwable, Future[Message]] = {
+    PartialFunction[Throwable, Future[Any]] = {
+    case e: RecoverException =>
+      e.future
     case e: CommandException =>
       replyQuote(e.getMessage, e.parseMode)
     case e: Exception =>

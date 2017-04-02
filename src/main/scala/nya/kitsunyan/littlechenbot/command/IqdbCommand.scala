@@ -2,6 +2,7 @@ package nya.kitsunyan.littlechenbot.command
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
+import nya.kitsunyan.littlechenbot.Utils
 import nya.kitsunyan.littlechenbot.database.IqdbConfigurationData
 import nya.kitsunyan.littlechenbot.service.BooruService
 
@@ -10,12 +11,12 @@ import scala.concurrent.Future
 trait IqdbCommand extends Command with ExtractImage with Http {
   private val commands = List("iqdb")
 
-  override def handleMessage(implicit message: Message): Future[_] = {
+  override def handleMessage(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[_] = {
-    case class IqdbResult(index: Int, url: String, booruService: BooruService,
+  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
+    case class IqdbResult(index: Int, url: String, previewUrl: Option[String], booruService: BooruService,
       alias: Option[String], similarity: Int, matches: Boolean)
 
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
@@ -23,12 +24,19 @@ trait IqdbCommand extends Command with ExtractImage with Http {
         .postMulti(telegramFile.multiPart("file"))
         .params(BooruService.list.map("service[]" -> _.iqdbId)).response(_.asString) { _ => body =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
-          "<td>(\\d+)% similarity</td>.*?</table>").r
+          "(?:<img src='(.*?)'.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
 
         val result = for {
           table <- tablePattern.findAllIn(body).matchData
-          similarity = table.group(1).toInt
+          similarity = table.group(2).toInt
+          previewUrl = {
+            Option(table.group(1)).map {
+              case i if i.startsWith("//") => "https:" + i
+              case i if i.startsWith("/") => "https://iqdb.org" + i
+              case i => i
+            }
+          }
           links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
           url = links.head match {
             case s if s.startsWith("//") => "https:" + s
@@ -37,10 +45,10 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           matches = similarity >= minSimilarity
           booruService = BooruService.findByUrl(url)
           if booruService.nonEmpty
-        } yield (url, booruService.get, similarity, matches)
+        } yield (url, previewUrl, booruService.get, similarity, matches)
 
-        result.foldLeft[List[IqdbResult]](Nil) { case ((list), (url, booruService, similarity, matches)) =>
-          IqdbResult(list.length, url, booruService, None, similarity, matches) :: list
+        result.foldLeft[List[IqdbResult]](Nil) { case ((list), (url, previewUrl, booruService, similarity, matches)) =>
+          IqdbResult(list.length, url, previewUrl, booruService, None, similarity, matches) :: list
         }.reverse
       }
     }
@@ -132,20 +140,25 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           "No images found (due to exception thrown)."
         }.getOrElse("No images found.")
 
-        val additionalResults = result.additionalIqdbResults.reverse.map { iqdbResult =>
+        val (additionalResults, previewUrls) = result.additionalIqdbResults.reverse.map { iqdbResult =>
           val index = iqdbResult.index + 1
           val serviceName = iqdbResult.booruService.displayName
           val similarity = iqdbResult.similarity
-          s"$index: $similarity% — $serviceName"
-        }.foldLeft("")(_ + "\n" + _)
-
-        if (additionalResults.isEmpty) {
-          throw result.exception.getOrElse(new CommandException(s"$notFoundMessage"))
-        } else if (query) {
-          throw new CommandException(s"Results:$additionalResults")
-        } else {
-          throw new CommandException(s"$notFoundMessage\n\nAdditional results:$additionalResults")
+          (s"$index: $similarity% — $serviceName", index, iqdbResult.previewUrl)
+        }.foldRight("", List[(Int, Option[String])]()) { case ((text, index, previewUrl), (results, previewUrls)) =>
+          (if (results.isEmpty) text else s"$text\n$results", (index, previewUrl) :: previewUrls)
         }
+
+        val messageText = if (additionalResults.isEmpty) {
+          notFoundMessage
+        } else if (query) {
+          s"Results:\n$additionalResults"
+        } else {
+          s"$notFoundMessage\n\nAdditional results:\n$additionalResults"
+        }
+
+        throw (if (additionalResults.isEmpty) result.exception else None)
+          .getOrElse(new RecoverException(replyWithQueryList(messageText, previewUrls)))
       }
     }
 
@@ -184,7 +197,32 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       Future[(ReadImageData, Message)] = {
       (if (displayTags) collectTags(false, imageData.tags) else None)
         .map(replyQuote(_)(messageWithImage).map((imageData, _)))
-        .getOrElse(Future { (imageData, messageWithImage) })
+        .getOrElse(Future {(imageData, messageWithImage)})
+    }
+
+    def replyWithQueryList(messageText: String, previewUrls: List[(Int, Option[String])]): Future[Message] = {
+      if (previewUrls.nonEmpty) {
+        previewUrls.map { case (index, previewUrl) =>
+          previewUrl.map { previewUrl =>
+            Future[(Int, Option[Array[Byte]], String)] {
+              http(previewUrl).response(_.asBytes)(_ => body => (index, Some(body), "image/jpeg"))
+            }.recover { case e =>
+              handleException(e, messageWithImageAsCausal)
+              (index, None, "")
+            }
+          }.getOrElse(Future {(index, None, "")})
+        }.foldRight[Future[List[(Int, Option[Array[Byte]], String)]]](Future {Nil}) { case (future, result) =>
+          result.flatMap(list => future.map(_ :: list))
+        }.flatMap { list =>
+          val preview = Utils.drawPreview(list)
+          preview.map { preview =>
+            request(SendPhoto(Left(message.sender), Left(InputFile("preview.png", preview)),
+              replyToMessageId = Some(message.messageId), caption = Some(messageText)))
+          }.getOrElse(replyQuote(messageText))
+        }
+      } else {
+        replyQuote(messageText)
+      }
     }
 
     def configureItem(userId: Long, minSimilarity: Option[Int], priority: Option[List[String]], reset: Boolean)
