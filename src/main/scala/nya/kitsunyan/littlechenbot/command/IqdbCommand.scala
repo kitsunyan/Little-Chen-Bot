@@ -43,9 +43,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
             case s => s
           }
           matches = similarity >= minSimilarity
-          booruService = BooruService.findByUrl(url)
-          if booruService.nonEmpty
-        } yield (url, previewUrl, booruService.get, similarity, matches)
+          booruService <- BooruService.findByUrl(url)
+        } yield (url, previewUrl, booruService, similarity, matches)
 
         result.foldLeft[List[IqdbResult]](Nil) { case ((list), (url, previewUrl, booruService, similarity, matches)) =>
           IqdbResult(list.length, url, previewUrl, booruService, None, similarity, matches) :: list
