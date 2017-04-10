@@ -165,11 +165,17 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       def appendIterable(title: String, skip: Boolean, list: Iterable[BooruService#Tag],
         filter: BooruService#Tag => Boolean)(s: String): String = {
         val filteredList = list.filter(filter)
-        if (!skip && list.nonEmpty) {
+        if (!skip && filteredList.nonEmpty) {
           val tags = (if (short) filteredList.take(3) else filteredList)
             .map(_.title).reduce(_ + ", " + _)
           val formatted = if (short) s"$title: $tags" else s"$title:\n$tags"
-          if (s.isEmpty) formatted else if (short) s"$s\n$formatted" else s"$s\n\n$formatted"
+          if (s.isEmpty) {
+            formatted
+          } else if (short) {
+            s"$s\n$formatted"
+          } else {
+            s"$s\n\n$formatted"
+          }
         } else {
           s
         }
