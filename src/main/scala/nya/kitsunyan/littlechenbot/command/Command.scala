@@ -13,6 +13,17 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleException(e: Throwable, causalMessage: Message): Unit
 
+  def handleError(causalMessage: Message, kind: String)(implicit message: Message):
+    PartialFunction[Throwable, Future[Any]] = {
+    case e: RecoverException =>
+      e.future
+    case e: CommandException =>
+      replyQuote(e.getMessage, e.parseMode)
+    case e: Exception =>
+      handleException(e, causalMessage)
+      replyQuote(s"An exception was thrown during $kind.")
+  }
+
   class Arguments(data: String) {
     private def parseArguments(data: String): Map[String, String] = {
       case class CharFold(quote: Boolean = false, escape: Boolean = false,

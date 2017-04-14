@@ -61,15 +61,4 @@ trait ExtractImage extends Command with Http {
       }
     }
   }
-
-  def handleError(causalMessage: Message, kind: String)(implicit message: Message):
-    PartialFunction[Throwable, Future[Any]] = {
-    case e: RecoverException =>
-      e.future
-    case e: CommandException =>
-      replyQuote(e.getMessage, e.parseMode)
-    case e: Exception =>
-      handleException(e, causalMessage)
-      replyQuote(s"An exception was thrown during $kind.")
-  }
 }
