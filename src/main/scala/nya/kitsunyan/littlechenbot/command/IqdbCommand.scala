@@ -1,10 +1,11 @@
 package nya.kitsunyan.littlechenbot.command
 
-import info.mukel.telegrambot4s.methods._
-import info.mukel.telegrambot4s.models._
 import nya.kitsunyan.littlechenbot.Utils
 import nya.kitsunyan.littlechenbot.database.IqdbConfigurationData
 import nya.kitsunyan.littlechenbot.service.BooruService
+
+import info.mukel.telegrambot4s.methods._
+import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 

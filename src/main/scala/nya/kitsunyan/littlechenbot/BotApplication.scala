@@ -1,17 +1,18 @@
 package nya.kitsunyan.littlechenbot
 
-import java.io.{PrintWriter, StringWriter}
-
-import com.typesafe.config._
+import nya.kitsunyan.littlechenbot.command._
 
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
-import nya.kitsunyan.littlechenbot.command._
+import com.typesafe.config._
+
+import java.io._
+
+import scalaj.http._
 
 import scala.concurrent.Future
-import scalaj.http._
 
 object BotApplication extends App {
   private val config = ConfigFactory.parseFile(new java.io.File("littlechenbot.conf"))

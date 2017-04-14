@@ -1,7 +1,8 @@
 package nya.kitsunyan.littlechenbot.command
 
+import scalaj.http._
+
 import scala.language.implicitConversions
-import scalaj.http.{HttpRequest, HttpResponse}
 
 trait Http {
   def http(url: String, proxy: Boolean = false): HttpRequest

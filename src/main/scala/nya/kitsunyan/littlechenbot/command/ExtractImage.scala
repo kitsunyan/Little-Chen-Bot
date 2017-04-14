@@ -1,11 +1,13 @@
 package nya.kitsunyan.littlechenbot.command
 
-import info.mukel.telegrambot4s.methods.{GetFile, ParseMode}
-import info.mukel.telegrambot4s.models.Message
 import nya.kitsunyan.littlechenbot.Utils
 
-import scala.concurrent.Future
+import info.mukel.telegrambot4s.methods._
+import info.mukel.telegrambot4s.models._
+
 import scalaj.http.MultiPart
+
+import scala.concurrent.Future
 
 trait ExtractImage extends Command with Http {
   def messageWithImage(implicit message: Message): Option[Message] = {

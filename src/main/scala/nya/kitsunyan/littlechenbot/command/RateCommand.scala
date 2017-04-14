@@ -1,10 +1,10 @@
 package nya.kitsunyan.littlechenbot.command
 
-import info.mukel.telegrambot4s.methods.SendSticker
-import info.mukel.telegrambot4s.models.Message
-
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
+
+import info.mukel.telegrambot4s.methods._
+import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
