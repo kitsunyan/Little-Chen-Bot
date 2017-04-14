@@ -141,4 +141,12 @@ object GelbooruService extends BooruService {
       }
     }
   }
+
+  def parseListHtml(html: String): List[String] = {
+    "<a id=\"p\\d+\" href=\"(index.php?.*?id=\\d+)\".*?>".r
+      .findAllIn(html).matchData.map(_.subgroups).map {
+      case (url :: Nil) => s"http://gelbooru.com/${url.replace("&amp;", "&")}"
+      case e => throw new MatchError(e)
+    }.toList
+  }
 }

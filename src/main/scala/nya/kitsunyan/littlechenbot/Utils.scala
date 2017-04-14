@@ -37,7 +37,7 @@ object Utils {
       val size = Point(160, 128)
       val indexSize = 24
       val maxColumns = 3
-      val columns = Math.min(images.length, maxColumns)
+      val columns = math.min(images.length, maxColumns)
       val rows = (images.length + maxColumns - 1) / maxColumns
       val totalWidth = columns * size.x
       val totalHeight = rows * size.y

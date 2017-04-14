@@ -20,8 +20,12 @@ trait Command extends BotBase with AkkaDefaults {
     case e: CommandException =>
       replyQuote(e.getMessage, e.parseMode)
     case e: Exception =>
-      handleException(e, causalMessage)
-      replyQuote(s"An exception was thrown during $kind.")
+      handleErrorCommon(e, causalMessage, kind)
+  }
+
+  def handleErrorCommon(e: Exception, causalMessage: Message, kind: String)(implicit message: Message): Future[Any] = {
+    handleException(e, causalMessage)
+    replyQuote(s"An exception was thrown during $kind.")
   }
 
   class Arguments(data: String) {
