@@ -100,7 +100,7 @@ trait Command extends BotBase with AkkaDefaults {
   final def filterMessage(commands: List[String], success: Arguments => Future[Any], fail: => Future[Any])
     (implicit message: Message): Future[Any] = {
     botNickname.flatMap { botNickname =>
-      (if (filterChat(message)) message.text orElse message.caption else None)
+      (message.text orElse message.caption)
         .flatMap(filterCommands(commands, botNickname))
         .map(success).getOrElse(fail)
     }
@@ -110,7 +110,11 @@ trait Command extends BotBase with AkkaDefaults {
 
   class CommandException(message: String, val parseMode: Option[ParseMode.ParseMode] = None) extends Exception(message)
 
-  final override def onMessage(message: Message): Unit = handleMessage(message)
+  final override def onMessage(message: Message): Unit = {
+    if (filterChat(message)) {
+      handleMessage(message)
+    }
+  }
 
   def handleMessage(implicit message: Message): Future[Any] = Future {}
 
