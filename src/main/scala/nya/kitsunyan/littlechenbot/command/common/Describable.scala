@@ -1,4 +1,4 @@
-package nya.kitsunyan.littlechenbot.command
+package nya.kitsunyan.littlechenbot.command.common
 
 trait Describable {
   case class Description(commands: List[String], text: String)

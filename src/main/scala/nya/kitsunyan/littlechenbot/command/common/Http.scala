@@ -1,4 +1,4 @@
-package nya.kitsunyan.littlechenbot.command
+package nya.kitsunyan.littlechenbot.command.common
 
 import scalaj.http._
 

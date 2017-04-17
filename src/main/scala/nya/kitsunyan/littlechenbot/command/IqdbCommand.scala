@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.Utils
+import nya.kitsunyan.littlechenbot.command.common._
 import nya.kitsunyan.littlechenbot.database.IqdbConfigurationData
 import nya.kitsunyan.littlechenbot.service.BooruService
 

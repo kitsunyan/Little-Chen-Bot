@@ -1,5 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
+import nya.kitsunyan.littlechenbot.command.common._
+
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 

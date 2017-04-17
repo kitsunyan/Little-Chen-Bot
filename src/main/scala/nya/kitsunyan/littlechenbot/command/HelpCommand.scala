@@ -1,5 +1,8 @@
 package nya.kitsunyan.littlechenbot.command
-import info.mukel.telegrambot4s.models.Message
+
+import nya.kitsunyan.littlechenbot.command.common._
+
+import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
