@@ -64,6 +64,8 @@ object BotApplication extends App {
           e.printStackTrace(new PrintWriter(writer))
           request(SendMessage(Left(botOwner), "```\n" + writer.toString + "\n```", Some(ParseMode.Markdown),
             Some(true), Some(true), Some(sentMessage.messageId)))
+        }.recover {
+          case e => e.printStackTrace()
         }
       }
     }

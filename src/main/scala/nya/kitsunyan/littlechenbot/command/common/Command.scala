@@ -132,7 +132,9 @@ trait Command extends BotBase with AkkaDefaults {
   class CommandException(message: String, val parseMode: Option[ParseMode.ParseMode] = None) extends Exception(message)
 
   final override def onMessage(message: Message): Unit = {
-    handleMessage(filterChat(message))(message)
+    handleMessage(filterChat(message))(message).recover {
+      case e => handleException(e, message)
+    }
   }
 
   def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future.unit
