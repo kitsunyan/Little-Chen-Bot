@@ -21,24 +21,28 @@ trait GuessCommand extends Command with Http {
 
   private val instances = mutable.HashMap[Long, Instance]()
 
-  override def handleMessage(implicit message: Message): Future[Any] = {
-    instances.synchronized {
-      instances.retain { case (_, instance) =>
-        instance.notExpired
-      }
-    }
-    message.replyToMessage.flatMap { replyToMessage =>
+  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+    if (filterChat.soft) {
       instances.synchronized {
-        instances.find { case (_, instance) =>
-          instance.messageIds.contains(replyToMessage.messageId)
-        }.map { case (key, instance) =>
-          val newInstance = instance.copy(future = instance.future.flatMap(handleRunningGame(key)),
-            lastUpdateTime = System.currentTimeMillis)
-          instances += key -> newInstance
-          newInstance.future
+        instances.retain { case (_, instance) =>
+          instance.notExpired
         }
       }
-    }.getOrElse(filterMessage(commands, handleMessageInternal, super.handleMessage))
+      message.replyToMessage.flatMap { replyToMessage =>
+        instances.synchronized {
+          instances.find { case (_, instance) =>
+            instance.messageIds.contains(replyToMessage.messageId)
+          }.map { case (key, instance) =>
+            val newInstance = instance.copy(future = instance.future.flatMap(handleRunningGame(key)),
+              lastUpdateTime = System.currentTimeMillis)
+            instances += key -> newInstance
+            newInstance.future
+          }
+        }
+      }.getOrElse(filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft))
+    } else {
+      super.handleMessage(filterChat)
+    }
   }
 
   private def handleRunningGame(key: Long)(game: Option[Game])(implicit message: Message): Future[Option[Game]] = {

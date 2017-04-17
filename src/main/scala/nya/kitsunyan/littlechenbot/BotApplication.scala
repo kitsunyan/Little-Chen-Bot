@@ -43,10 +43,15 @@ object BotApplication extends App {
       } yield (host, port, java.net.Proxy.Type.valueOf(typeString.toUpperCase))
     }
 
-    override def filterChat(message: Message): Boolean = {
-      message.date >= startTime && (chats.contains(message.chat.id) ||
-        chatsAnyPrivate && Set("private").contains(message.chat.`type`) ||
-        chatsAnyGroup && Set("group", "supergroup").contains(message.chat.`type`))
+    override def filterChat(message: Message): FilterChat = {
+      if (message.date < startTime) {
+        FilterChat(false, false)
+      } else {
+        val soft = chats.contains(message.chat.id) ||
+          chatsAnyPrivate && Set("private").contains(message.chat.`type`) ||
+          chatsAnyGroup && Set("group", "supergroup").contains(message.chat.`type`)
+        FilterChat(soft, true)
+      }
     }
 
     override def handleException(e: Throwable, causalMessage: Message): Unit = {

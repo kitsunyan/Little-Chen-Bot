@@ -25,8 +25,8 @@ trait RateCommand extends Command with ExtractImage with Http {
     "CAADAgADxgEAAiX3NwgpkLZRMe1h0wI" ::
     Nil
 
-  override def handleMessage(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage)
+  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {

@@ -9,7 +9,9 @@ import scala.concurrent.Future
 trait Command extends BotBase with AkkaDefaults {
   val botNickname: Future[String]
 
-  def filterChat(message: Message): Boolean = true
+  case class FilterChat(soft: Boolean, hard: Boolean)
+
+  def filterChat(message: Message): FilterChat = FilterChat(true, true)
 
   def handleException(e: Throwable, causalMessage: Message): Unit
 
@@ -112,12 +114,16 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  final def filterMessage(commands: List[String], success: Arguments => Future[Any], fail: => Future[Any])
-    (implicit message: Message): Future[Any] = {
+  final def filterMessage(commands: List[String], success: Arguments => Future[Any], fail: => Future[Any],
+    allow: Boolean)(implicit message: Message): Future[Any] = {
     botNickname.flatMap { botNickname =>
-      (message.text orElse message.caption)
-        .flatMap(filterCommands(commands, botNickname))
-        .map(success).getOrElse(fail)
+      if (allow) {
+        (message.text orElse message.caption)
+          .flatMap(filterCommands(commands, botNickname))
+          .map(success).getOrElse(fail)
+      } else {
+        fail
+      }
     }
   }
 
@@ -126,12 +132,10 @@ trait Command extends BotBase with AkkaDefaults {
   class CommandException(message: String, val parseMode: Option[ParseMode.ParseMode] = None) extends Exception(message)
 
   final override def onMessage(message: Message): Unit = {
-    if (filterChat(message)) {
-      handleMessage(message)
-    }
+    handleMessage(filterChat(message))(message)
   }
 
-  def handleMessage(implicit message: Message): Future[Any] = Future {}
+  def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future {}
 
   def replyQuote(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {

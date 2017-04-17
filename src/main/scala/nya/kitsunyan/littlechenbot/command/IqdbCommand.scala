@@ -12,8 +12,8 @@ import scala.concurrent.Future
 trait IqdbCommand extends Command with ExtractImage with Http {
   private val commands = List("iqdb")
 
-  override def handleMessage(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage)
+  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
