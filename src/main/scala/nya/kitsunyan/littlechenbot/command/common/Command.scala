@@ -168,9 +168,9 @@ trait Command extends BotBase with AkkaDefaults {
 
       val valuesFull = values.map(v => s" `[$v]`").getOrElse("")
       s"$parametersFull$valuesFull$descriptionFull"
-    }.reduce(_ + "\n" + _)
+    }.foldLeft("")(_ + "\n" + _)
 
-    val text = if (argumentsListText.nonEmpty) s"$description\n\n$argumentsListText" else description
+    val text = if (argumentsListText.nonEmpty) s"$description\n$argumentsListText" else description
     replyQuote(text, Some(ParseMode.Markdown))
   }
 }
