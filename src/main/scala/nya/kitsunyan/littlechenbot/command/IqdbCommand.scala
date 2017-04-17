@@ -203,7 +203,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
       Future[(ReadImageData, Message)] = {
       (if (displayTags) collectTags(false, imageData.tags) else None)
         .map(replyQuote(_)(messageWithImage).map((imageData, _)))
-        .getOrElse(Future {(imageData, messageWithImage)})
+        .getOrElse(Future.successful(imageData, messageWithImage))
     }
 
     def replyWithQueryList(messageText: String, previewUrls: List[(Int, Option[String])]): Future[Message] = {
@@ -216,8 +216,8 @@ trait IqdbCommand extends Command with ExtractImage with Http {
               handleException(e, messageWithImageAsCausal)
               (index, None, "")
             }
-          }.getOrElse(Future {(index, None, "")})
-        }.foldRight[Future[List[(Int, Option[Array[Byte]], String)]]](Future {Nil}) { case (future, result) =>
+          }.getOrElse(Future.successful(index, None, ""))
+        }.foldRight[Future[List[(Int, Option[Array[Byte]], String)]]](Future.successful(Nil)) { case (future, result) =>
           result.flatMap(list => future.map(_ :: list))
         }.flatMap { list =>
           val preview = Utils.drawPreview(list)
@@ -246,7 +246,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           .getOrElse(IqdbConfigurationData.delete(item.userId))
           .map(_ => item)
       } else {
-        Future {item}
+        Future.successful(item)
       }
     }
 
@@ -260,11 +260,11 @@ trait IqdbCommand extends Command with ExtractImage with Http {
 
     def getConfiguration[T](argument: Option[T], callback: IqdbConfigurationData.Item => Option[T],
       default: T): Future[T] = {
-      argument.map(v => Future {v}).getOrElse {
+      argument.map(Future.successful).getOrElse {
         message.from.map(_.id.toLong)
           .map(IqdbConfigurationData.get)
           .map(_.map(_.flatMap(callback).getOrElse(default)))
-          .getOrElse(Future {default})
+          .getOrElse(Future.successful(default))
       }
     }
 
@@ -349,7 +349,7 @@ trait IqdbCommand extends Command with ExtractImage with Http {
           .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
           .recoverWith(handleError(message, "configuration handling"))
-      }.getOrElse(Future {})
+      }.getOrElse(Future.unit)
     } else {
       val indexOption = arguments.int("i", "index")
       val query = arguments.string("q", "query").nonEmpty

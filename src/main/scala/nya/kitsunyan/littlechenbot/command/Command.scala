@@ -135,7 +135,7 @@ trait Command extends BotBase with AkkaDefaults {
     handleMessage(filterChat(message))(message)
   }
 
-  def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future {}
+  def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future.unit
 
   def replyQuote(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {

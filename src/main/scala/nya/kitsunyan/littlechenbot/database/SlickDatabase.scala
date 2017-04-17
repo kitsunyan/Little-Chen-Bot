@@ -24,13 +24,13 @@ object SlickDatabase extends AkkaDefaults {
 
   // Create all tables
   private val createFuture = List(iqdbConfiguration, iqdbConfigurationPriority)
-    .foldLeft[Future[Unit]](Future {}) { (future, table) =>
+    .foldLeft[Future[Unit]](Future.unit) { (future, table) =>
     future.flatMap(_ => database.run(slick.jdbc.meta.MTable.getTables))
       .map(_.map(_.name.name).contains(table.baseTableRow.tableName)).flatMap { exists =>
       if (!exists) {
         database.run(table.schema.create)
       } else {
-        Future {}
+        Future.unit
       }
     }
   }

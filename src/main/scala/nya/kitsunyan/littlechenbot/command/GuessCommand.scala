@@ -132,7 +132,7 @@ trait GuessCommand extends Command with Http {
     game.map { game =>
       Future(parseMessage(game)).flatMap(replyOptional(game))
         .recoverWith(handleErrorInternal)
-    }.getOrElse(Future(None))
+    }.getOrElse(Future.successful(None))
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
@@ -211,7 +211,7 @@ trait GuessCommand extends Command with Http {
       val game = Game(tags.filter(_.character).map(_.title), knownTags, hiddenTags, url, pageUrl)
       replyQuote("Tags:\n\n" + game.knownTags.reduce(_ + "\n" + _)).map { resultMessage =>
         instances.synchronized {
-          instances += resultMessage.messageId -> Instance(Future(Some(game)),
+          instances += resultMessage.messageId -> Instance(Future.successful(Some(game)),
             Set(resultMessage.messageId), System.currentTimeMillis)
         }
         resultMessage
