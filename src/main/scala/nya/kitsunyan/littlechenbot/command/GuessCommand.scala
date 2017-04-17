@@ -6,6 +6,12 @@ import nya.kitsunyan.littlechenbot.service.GelbooruService
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
+import akka.actor._
+import akka.pattern.ask
+import akka.util.Timeout
+
+import java.util.concurrent.TimeUnit
+
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.Random
@@ -24,27 +30,57 @@ trait GuessCommand extends Command with Describable with Http {
   private case class Game(characters: List[String], knownTags: List[String], hiddenTags: List[String],
     url: String, pageUrl: String)
 
-  private val instances = mutable.HashMap[Long, Instance]()
+  private case class CreateGame(messageId: Long, game: Game)
+  private case class UpdateGame(key: Long, messageId: Long)
+  private case class RemoveGame(key: Long)
+  private case class HandleRunningGame(replyToMessageId: Long, next: Long => Option[Game] => Future[Option[Game]])
+  private case object CleanupInstances
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    if (filterChat.soft) {
-      instances.synchronized {
+  private val actor = ActorSystem("GuessCommand").actorOf(Props(new GuessActor))
+  private implicit val timeout = Timeout(1, TimeUnit.DAYS)
+
+  private class GuessActor extends Actor {
+    private val instances = mutable.HashMap[Long, Instance]()
+
+    def receive: PartialFunction[Any, Unit] = {
+      case CreateGame(messageId, game) =>
+        instances += messageId -> Instance(Future.successful(Some(game)), Set(messageId), System.currentTimeMillis)
+        sender ! {}
+      case UpdateGame(key, messageId) =>
+        instances.get(key).foreach { instance =>
+          instances += key -> instance.copy(messageIds = instance.messageIds + messageId)
+        }
+        sender ! {}
+      case RemoveGame(key) =>
+        instances.remove(key)
+        sender ! {}
+      case HandleRunningGame(replyToMessageId, next) =>
+        val futureOption = instances.find { case (_, instance) =>
+          instance.messageIds.contains(replyToMessageId)
+        }.map { case (key, instance) =>
+          val newInstance = instance.copy(future = instance.future.flatMap(next(key)),
+            lastUpdateTime = System.currentTimeMillis)
+          instances += key -> newInstance
+          newInstance.future
+        }
+        sender ! futureOption
+      case CleanupInstances =>
         instances.retain { case (_, instance) =>
           instance.notExpired
         }
+        sender ! {}
+    }
+  }
+
+  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+    if (filterChat.soft) {
+      (actor ? CleanupInstances).flatMap { _ =>
+        message.replyToMessage.map { replyToMessage =>
+          (actor ? HandleRunningGame(replyToMessage.messageId, handleRunningGame)).mapTo[Option[Future[Any]]]
+        }.getOrElse(Future.successful(None)).flatMap(_.getOrElse {
+          filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
+        })
       }
-      message.replyToMessage.flatMap { replyToMessage =>
-        instances.synchronized {
-          instances.find { case (_, instance) =>
-            instance.messageIds.contains(replyToMessage.messageId)
-          }.map { case (key, instance) =>
-            val newInstance = instance.copy(future = instance.future.flatMap(handleRunningGame(key)),
-              lastUpdateTime = System.currentTimeMillis)
-            instances += key -> newInstance
-            newInstance.future
-          }
-        }
-      }.getOrElse(filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft))
     } else {
       super.handleMessage(filterChat)
     }
@@ -100,12 +136,8 @@ trait GuessCommand extends Command with Describable with Http {
             replyToMessageId = Some(message.messageId), caption = Some(text)))
         }.getOrElse {
           replyQuote(text)
-        }.map { _ =>
-          instances.synchronized {
-            instances.remove(key)
-          }
-          None
-        }
+        }.flatMap(_ => actor ? RemoveGame(key))
+          .map(_ => None)
       }
     }
 
@@ -117,14 +149,9 @@ trait GuessCommand extends Command with Describable with Http {
       val text = "You are wrong!"
       val fullText = tag.map(tag => s"$text\n\nNext tag: $tag").getOrElse(text)
 
-      replyQuote(fullText).map { resultMessage =>
-        instances.synchronized {
-          instances.get(key).foreach { instance =>
-            instances += key -> instance.copy(messageIds = instance.messageIds + resultMessage.messageId)
-          }
-        }
-        Some(nextGame)
-      }
+      replyQuote(fullText)
+        .flatMap(m => actor ? UpdateGame(key, m.messageId))
+        .map(_ => Some(nextGame))
     }
 
     def replyOptional(game: Game)(success: Boolean): Future[Option[Game]] = {
@@ -219,13 +246,8 @@ trait GuessCommand extends Command with Describable with Http {
       val hiddenTags = shuffledTags.drop(startCount)
 
       val game = Game(tags.filter(_.character).map(_.title), knownTags, hiddenTags, url, pageUrl)
-      replyQuote("Tags:\n\n" + game.knownTags.reduce(_ + "\n" + _)).map { resultMessage =>
-        instances.synchronized {
-          instances += resultMessage.messageId -> Instance(Future.successful(Some(game)),
-            Set(resultMessage.messageId), System.currentTimeMillis)
-        }
-        resultMessage
-      }
+      replyQuote("Tags:\n\n" + game.knownTags.reduce(_ + "\n" + _))
+        .flatMap(m => (actor ? CreateGame(m.messageId, game)).map(_ => m))
     }
 
     if (arguments.string("h", "help").nonEmpty) {
