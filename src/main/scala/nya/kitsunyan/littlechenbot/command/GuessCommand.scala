@@ -53,7 +53,12 @@ trait GuessCommand extends Command with Describable with Http {
   private def handleRunningGame(key: Long)(game: Option[Game])(implicit message: Message): Future[Option[Game]] = {
     def parseMessage(game: Game): Boolean = {
       def transformText(text: String): Set[String] = {
-        text.replace('_', ' ').split(" +").toSet.filter(_.length >= 2).map(_.toLowerCase)
+        text.replace('_', ' ')
+          .replaceAll("\\(.*?\\)", "")
+          .split(" +")
+          .toSet[String]
+          .map(_.trim.toLowerCase)
+          .filter(_.length >= 2)
       }
 
       val text = (message.text orElse message.caption).getOrElse("")
