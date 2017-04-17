@@ -9,8 +9,12 @@ import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
-trait IqdbCommand extends Command with ExtractImage with Http {
+trait IqdbCommand extends Command with Describable with ExtractImage with Http {
   private val commands = List("iqdb")
+
+  override def prependDescription(list: List[Description]): List[Description] = {
+    super.prependDescription(Description(commands, "find image with iqdb") :: list)
+  }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)

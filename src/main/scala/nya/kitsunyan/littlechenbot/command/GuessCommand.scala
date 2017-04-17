@@ -9,8 +9,12 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.Random
 
-trait GuessCommand extends Command with Http {
+trait GuessCommand extends Command with Describable with Http {
   private val commands = List("guess")
+
+  override def prependDescription(list: List[Description]): List[Description] = {
+    super.prependDescription(Description(commands, "a small game in guessing a character") :: list)
+  }
 
   private case class Instance(future: Future[Option[Game]], messageIds: Set[Long], lastUpdateTime: Long) {
     def notExpired: Boolean = System.currentTimeMillis <= lastUpdateTime + 5 * 60 * 1000

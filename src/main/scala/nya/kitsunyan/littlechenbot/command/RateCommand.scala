@@ -8,8 +8,12 @@ import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
-trait RateCommand extends Command with ExtractImage with Http {
+trait RateCommand extends Command with Describable with ExtractImage with Http {
   private val commands = List("rate", "r8")
+
+  override def prependDescription(list: List[Description]): List[Description] = {
+    super.prependDescription(Description(commands, "rate image") :: list)
+  }
 
   private val ratings =
     "CAADAgADtQEAAiX3NwilKgTAwYCiHAI" ::
