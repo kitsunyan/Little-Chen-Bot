@@ -114,4 +114,20 @@ object Utils {
         None
     }
   }
+
+  def unescapeHtml(s: String): String = {
+    Option(s).filter(!_.isEmpty).flatMap { s =>
+      try {
+        import javax.swing.text.html.HTMLDocument
+        import javax.swing.text.html.HTMLEditorKit
+        import java.io.StringReader
+
+        val document = new HTMLDocument
+        new HTMLEditorKit().read(new StringReader(s), document, 0)
+        Some(document.getText(1, document.getLength - 1))
+      } catch {
+        case _: Exception => None
+      }
+    }.getOrElse(s)
+  }
 }

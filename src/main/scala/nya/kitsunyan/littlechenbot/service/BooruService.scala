@@ -1,5 +1,7 @@
 package nya.kitsunyan.littlechenbot.service
 
+import nya.kitsunyan.littlechenbot.Utils
+
 import scala.util.matching.Regex
 
 sealed trait BooruService {
@@ -70,7 +72,7 @@ object DanbooruService extends BooruService {
         val tags = "<li class=\"category-(\\d+)\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
           .findAllIn(html).matchData.map(_.subgroups).map {
           case (category :: title :: Nil) =>
-            Tag(title)(category == "4", category == "3", category == "1")
+            Tag(Utils.unescapeHtml(title))(category == "4", category == "3", category == "1")
           case e => throw new MatchError(e)
         }.toList.distinct
 
@@ -98,7 +100,8 @@ object YandereService extends BooruService {
       val tags = "<li class=\".*?tag-type-(.*?)\" .*?data-name=\"(.*?)\"".r
         .findAllIn(html).matchData.map(_.subgroups).map {
         case (category :: title :: Nil) =>
-          Tag(title.replace('_', ' '))(category == "character", category == "copyright", category == "artist")
+          Tag(Utils.unescapeHtml(title).replace('_', ' '))(category == "character",
+            category == "copyright", category == "artist")
         case e => throw new MatchError(e)
       }.toList.distinct
 
@@ -131,7 +134,7 @@ object GelbooruService extends BooruService {
         val tags = "<li class=\"tag-type-(.*?)\"><a .*?page=post.*?>(.*?)</a>".r
           .findAllIn(html).matchData.map(_.subgroups).map {
           case (category :: title :: Nil) =>
-            Tag(title)(category == "character", category == "copyright", category == "artist")
+            Tag(Utils.unescapeHtml(title))(category == "character", category == "copyright", category == "artist")
           case e => throw new MatchError(e)
         }.toList.distinct
 
