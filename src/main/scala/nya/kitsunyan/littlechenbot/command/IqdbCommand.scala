@@ -362,7 +362,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)
 
-      Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
+      Future(obtainMessageFile(commands.head, messageWithImage)).flatMap(readTelegramFile)
         .flatMap(withConfiguration(sendIqdbRequest, similarity))
         .flatMap(withConfiguration(applyPriority, priority))
         .map(filterByIndex(indexOption)).map(readBooruImages(query))

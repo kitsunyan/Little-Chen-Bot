@@ -18,7 +18,7 @@ trait ExtractImage extends Command with Http {
     messageWithImage.getOrElse(message)
   }
 
-  def extractFileId(message: Message): Option[String] = {
+  def extractFile(message: Message): Option[String] = {
     message.photo.map { photos =>
       photos.reduceLeft { (photo1, photo2) =>
         // Find the largest image
@@ -29,12 +29,20 @@ trait ExtractImage extends Command with Http {
         case Some(mimeType) if mimeType.startsWith("image/") => Some(document.fileId)
         case _ => None
       }
+    } orElse {
+      for {
+        entity <- message.entities.flatMap(_.find(_.`type` == "url"))
+        text <- message.text
+        if text.length <= entity.offset + entity.length
+        url = text.substring(entity.offset, entity.offset + entity.length)
+        if url.startsWith("http://") || url.startsWith("https://")
+      } yield url
     }
   }
 
-  def obtainMessageFileId(command: String, messageWithImage: Option[Message]): String = {
-    messageWithImage.flatMap(extractFileId) match {
-      case Some(fileId) => fileId
+  def obtainMessageFile(command: String, messageWithImage: Option[Message]): String = {
+    messageWithImage.flatMap(extractFile) match {
+      case Some(file) => file
       case None =>
         throw new CommandException("Please reply to message with image or send image with command in caption.\n\n" +
           "Remember I can't see other bots' messages even when you reply them!\n\n" +
@@ -46,18 +54,49 @@ trait ExtractImage extends Command with Http {
     def multiPart(name: String): MultiPart = MultiPart(name, "filename", mimeType, data)
   }
 
-  def readTelegramFile(fileId: String): Future[TelegramFile] = {
-    request(GetFile(fileId)).map { file =>
-      file.filePath match {
-        case Some(path) =>
-          val data = {
-            val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-            val data = http(telegramImageUrl).asBytes.body
-            (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
-          }
-          val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
-          TelegramFile(data, mimeType)
-        case None => throw new CommandException("Unable to fetch Telegram file.")
+  private def readExternalFile(file: String, readMeta: Boolean): Either[TelegramFile, String] = {
+    http(file, proxy = true).response(_.asBytes) { response => body =>
+      val contentType = response.headers.get("Content-Type").flatMap(_.headOption).map { contentType =>
+        val index = contentType.indexOf(';')
+        if (index >= 0) contentType.substring(0, index) else contentType
+      }
+
+      def unable: Nothing = throw new CommandException("Unable to fetch the file by URL.")
+
+      contentType match {
+        case Some(mimeType) if mimeType.startsWith("image/") => Left(TelegramFile(body, mimeType))
+        case Some("text/html") if readMeta =>
+          val responseString = new String(body, "ISO-8859-1")
+          "<meta property=\"og:image\" content=\"(.*?)\".*?>".r
+            .findFirstMatchIn(responseString)
+            .flatMap(_.subgroups.headOption)
+            .filter(url => url.startsWith("http://") || url.startsWith("https://"))
+            .map(Right.apply)
+            .getOrElse(unable)
+        case _ => unable
+      }
+    }
+  }
+
+  def readTelegramFile(file: String): Future[TelegramFile] = {
+    if (file.startsWith("http://") || file.startsWith("https://")) {
+      Future(readExternalFile(file, true)).map {
+        case Left(telegramFile) => telegramFile
+        case Right(url) => readExternalFile(url, false).left.getOrElse(throw new Exception("Impossible value."))
+      }
+    } else {
+      request(GetFile(file)).map { file =>
+        file.filePath match {
+          case Some(path) =>
+            val data = {
+              val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
+              val data = http(telegramImageUrl).asBytes.body
+              (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
+            }
+            val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
+            TelegramFile(data, mimeType)
+          case None => throw new CommandException("Unable to fetch Telegram file.")
+        }
       }
     }
   }

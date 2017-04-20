@@ -62,7 +62,7 @@ trait RateCommand extends Command with Describable with ExtractImage with Http {
           "Display this help.") ::
         Nil)
     } else {
-      Future(obtainMessageFileId(commands.head, messageWithImage)).flatMap(readTelegramFile)
+      Future(obtainMessageFile(commands.head, messageWithImage)).flatMap(readTelegramFile)
         .map(sendEverypixelRequest).flatMap(replyWithRating)
         .recoverWith(handleError(messageWithImageAsCausal, "rating request"))
     }
