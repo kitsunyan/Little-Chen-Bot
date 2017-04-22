@@ -22,26 +22,27 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
-    case class IqdbResult(index: Int, url: String, previewUrl: Option[String], booruService: BooruService,
-      alias: Option[String], similarity: Int, matches: Boolean)
+    case class IqdbResult(index: Int, url: String, previewUrl: Option[String], blurMode: Utils.BlurMode,
+      booruService: BooruService, alias: Option[String], similarity: Int, matches: Boolean)
 
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
       http("https://iqdb.org/")
         .postMulti(telegramFile.multiPart("file"))
         .params(BooruService.list.map("service[]" -> _.iqdbId)).response(_.asString) { _ => body =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
-          "(?:<img src='(.*?)'.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
+          "(?:<img src='(.*?)'.*?)?(?:<td>\\d+×\\d+ \\[(\\w+)\\]</td>.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
 
-        val result = for {
+        case class Result(url: String, previewUrl: Option[String], blurMode: Utils.BlurMode,
+          booruService: BooruService, similarity: Int, matches: Boolean)
+
+        val results = for {
           table <- tablePattern.findAllIn(body).matchData
-          similarity = table.group(2).toInt
-          previewUrl = {
-            Option(table.group(1)).map {
-              case i if i.startsWith("//") => "https:" + i
-              case i if i.startsWith("/") => "https://iqdb.org" + i
-              case i => i
-            }
+          similarity = table.group(3).toInt
+          previewUrl = Option(table.group(1)).map {
+            case i if i.startsWith("//") => "https:" + i
+            case i if i.startsWith("/") => "https://iqdb.org" + i
+            case i => i
           }
           links <- linkPattern.findAllIn(table.group(0)).matchData.map(_.subgroups)
           url = links.head match {
@@ -50,10 +51,16 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
           }
           matches = similarity >= minSimilarity
           booruService <- BooruService.findByUrl(url)
-        } yield (url, previewUrl, booruService, similarity, matches)
+          blurMode = Option(table.group(2)).flatMap {
+            case "Safe" => Some(Utils.BlurMode.No)
+            case "Ero" => Some(Utils.BlurMode.Soft)
+            case _ => None
+          }.getOrElse(Utils.BlurMode.Hard)
+        } yield Result(url, previewUrl, blurMode, booruService, similarity, matches)
 
-        result.foldLeft[List[IqdbResult]](Nil) { case ((list), (url, previewUrl, booruService, similarity, matches)) =>
-          IqdbResult(list.length, url, previewUrl, booruService, None, similarity, matches) :: list
+        results.foldLeft[List[IqdbResult]](Nil) { (list, result) =>
+          IqdbResult(list.length, result.url, result.previewUrl, result.blurMode,
+            result.booruService, None, result.similarity, result.matches) :: list
         }.reverse
       }
     }
@@ -95,6 +102,8 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
       val tags: List[BooruService#Tag]) {
       def pageUrl: String = pageUrlFunction()
     }
+
+    case class PreviewBlank(index: Int, url: Option[String], blurMode: Utils.BlurMode)
 
     def readBooruPage(iqdbResult: IqdbResult): ImageData = {
       val pageUrl = iqdbResult.url
@@ -145,13 +154,15 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
           "No images found (due to exception thrown)."
         }.getOrElse("No images found.")
 
-        val (additionalResults, previewUrls) = result.additionalIqdbResults.reverse.map { iqdbResult =>
+        val (additionalResults, previewBlanks) = result.additionalIqdbResults.reverse.map { iqdbResult =>
           val index = iqdbResult.index + 1
           val serviceName = iqdbResult.booruService.displayName
           val similarity = iqdbResult.similarity
-          (s"$index: $similarity% — $serviceName", index, iqdbResult.previewUrl)
-        }.foldRight("", List[(Int, Option[String])]()) { case ((text, index, previewUrl), (results, previewUrls)) =>
-          (if (results.isEmpty) text else s"$text\n$results", (index, previewUrl) :: previewUrls)
+          (s"$index: $similarity% — $serviceName", index, iqdbResult.previewUrl, iqdbResult.blurMode)
+        }.foldRight("", List[PreviewBlank]()) { case ((text, index, previewUrl, blurMode), (results, previewBlanks)) =>
+          val newResult = if (results.isEmpty) text else s"$text\n$results"
+          val newPreviewBlanks = PreviewBlank(index, previewUrl, blurMode) :: previewBlanks
+          (newResult, newPreviewBlanks)
         }
 
         val messageText = if (additionalResults.isEmpty) {
@@ -163,7 +174,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         }
 
         throw (if (additionalResults.isEmpty) result.exception else None)
-          .getOrElse(new RecoverException(replyWithQueryList(messageText, previewUrls)))
+          .getOrElse(new RecoverException(replyWithQueryList(messageText, previewBlanks)))
       }
     }
 
@@ -211,18 +222,20 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         .getOrElse(Future.successful(imageData, messageWithImage))
     }
 
-    def replyWithQueryList(messageText: String, previewUrls: List[(Int, Option[String])]): Future[Message] = {
-      if (previewUrls.nonEmpty) {
-        previewUrls.map { case (index, previewUrl) =>
-          previewUrl.map { previewUrl =>
-            Future[(Int, Option[Array[Byte]], String)] {
-              http(previewUrl).response(_.asBytes)(_ => body => (index, Some(body), "image/jpeg"))
+    def replyWithQueryList(messageText: String, previewBlanks: List[PreviewBlank]): Future[Message] = {
+      if (previewBlanks.nonEmpty) {
+        previewBlanks.map { previewBlank =>
+          previewBlank.url.map { previewUrl =>
+            Future {
+              http(previewUrl).response(_.asBytes) { _ => body =>
+                Utils.Preview(previewBlank.index, Some(body), "image/jpeg", previewBlank.blurMode)
+              }
             }.recover { case e =>
               handleException(e, messageWithImageAsCausal)
-              (index, None, "")
+              Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)
             }
-          }.getOrElse(Future.successful(index, None, ""))
-        }.foldRight[Future[List[(Int, Option[Array[Byte]], String)]]](Future.successful(Nil)) { case (future, result) =>
+          }.getOrElse(Future.successful(Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)))
+        }.foldRight[Future[List[Utils.Preview]]](Future.successful(Nil)) { (future, result) =>
           result.flatMap(list => future.map(_ :: list))
         }.flatMap { list =>
           val preview = Utils.drawPreview(list)

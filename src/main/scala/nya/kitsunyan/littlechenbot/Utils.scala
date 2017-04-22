@@ -28,7 +28,27 @@ object Utils {
     }
   }
 
-  def drawPreview(images: List[(Int, Option[Array[Byte]], String)]): Option[Array[Byte]] = {
+  sealed trait BlurMode
+
+  object BlurMode {
+    case object No extends BlurMode
+    case object Soft extends BlurMode
+    case object Hard extends BlurMode
+  }
+
+  case class Preview(index: Int, image: Option[Array[Byte]], mimeType: String, blurMode: BlurMode) {
+    def extension: Option[String] = {
+      mimeType match {
+        case "image/jpeg" => Some("jpg")
+        case "image/png" => Some("png")
+        case "image/gif" => Some("gif")
+        case "image/webp" => Some("webp")
+        case _ => None
+      }
+    }
+  }
+
+  def drawPreview(previews: List[Preview]): Option[Array[Byte]] = {
     case class Rect(left: Int, top: Int, right: Int, bottom: Int)
     case class Point(x: Int, y: Int)
 
@@ -37,8 +57,8 @@ object Utils {
       val size = Point(160, 128)
       val indexSize = 24
       val maxColumns = 3
-      val columns = math.min(images.length, maxColumns)
-      val rows = (images.length + maxColumns - 1) / maxColumns
+      val columns = math.min(previews.length, maxColumns)
+      val rows = (previews.length + maxColumns - 1) / maxColumns
       val totalWidth = columns * size.x
       val totalHeight = rows * size.y
 
@@ -47,25 +67,30 @@ object Utils {
       val indexCircleColor = "#88bbee"
       val indexTextColor = "#222222"
 
-      Some(images.map { case (index, image, mimeType) =>
+      Some(previews.map { preview =>
         val width = size.x - padding.left - padding.right
         val height = size.y - padding.top - padding.bottom
 
-        // Resize image to ${width}x${height} square
-        val newImage = image.flatMap { image =>
-          (if (mimeType == "image/jpeg") {
-            Some("jpg:-")
-          } else if (mimeType == "image/png") {
-            Some("png:-")
-          } else {
-            None
-          }).map { extensionIn =>
-            exec(Some(image), Array("convert", extensionIn, "-resize", s"${width}x${height}",
-              "-background", imageBackgroundColor, "-gravity", "center", "-extent", s"${width}x${height}", "png:-"))
+        // Resize image to ${width}x${height} square and blur
+        val newImage = preview.image.flatMap { image =>
+          preview.extension.map(_ + ":-").map { extensionIn =>
+            val denominator = preview.blurMode match {
+              case BlurMode.No => Int.MaxValue
+              case BlurMode.Soft => 25
+              case BlurMode.Hard => 15
+            }
+            val blurRadius = math.max(width, height) / denominator
+
+            val c1 = List("convert", extensionIn, "-resize", s"${width}x${height}")
+            val c2 = List("-blur", s"${blurRadius}x${blurRadius / 2}")
+            val c3 = List("-background", imageBackgroundColor, "-gravity", "center",
+              "-extent", s"${width}x${height}", "png:-")
+
+            exec(Some(image), (c1 ::: (if (blurRadius >= 2) c2 else Nil) ::: c3).toArray)
           }
         }
 
-        (index, newImage)
+        (preview.index, newImage)
       }.foldLeft(exec(None, Array("convert", "-size", s"${totalWidth}x${totalHeight}",
         s"canvas:$backgroundColor", "png:-")), 0) { case ((result, i), (index, image)) =>
         // Draw each image on canvas
