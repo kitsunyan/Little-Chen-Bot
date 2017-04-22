@@ -7,7 +7,10 @@ import info.mukel.telegrambot4s.models._
 import scala.concurrent.Future
 
 trait Command extends BotBase with AkkaDefaults {
-  val botNickname: Future[String]
+  case class Bot(nickname: String, id: Long)
+
+  val bot: Future[Bot]
+  val workspace: Option[Long]
 
   case class FilterChat(soft: Boolean, hard: Boolean)
 
@@ -15,7 +18,7 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleException(e: Throwable, causalMessage: Message): Unit
 
-  def handleError(causalMessage: Message, kind: String)(implicit message: Message):
+  def handleError(kind: String)(causalMessage: Message)(implicit message: Message):
     PartialFunction[Throwable, Future[Any]] = {
     case e: RecoverException =>
       e.future
@@ -51,10 +54,10 @@ trait Command extends BotBase with AkkaDefaults {
 
   final def filterMessage(commands: List[String], success: Arguments => Future[Any], fail: => Future[Any],
     allow: Boolean)(implicit message: Message): Future[Any] = {
-    botNickname.flatMap { botNickname =>
+    bot.flatMap { bot =>
       if (allow) {
         (message.text orElse message.caption)
-          .flatMap(filterCommands(commands, botNickname))
+          .flatMap(filterCommands(commands, bot.nickname))
           .map(success).getOrElse(fail)
       } else {
         fail

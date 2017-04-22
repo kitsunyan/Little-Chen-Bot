@@ -132,7 +132,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
       }
     }
 
-    def readBooruImages(query: Boolean)(iqdbResults: List[IqdbResult]): ReadImageData = {
+    def readBooruImages(messageWithImage: Message, query: Boolean)(iqdbResults: List[IqdbResult]): ReadImageData = {
       case class Result(successImageData: Option[ReadImageData] = None,
         additionalIqdbResults: List[IqdbResult] = Nil, exception: Option[Exception] = None)
 
@@ -150,9 +150,9 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
 
       result.successImageData.getOrElse {
         val notFoundMessage = result.exception.map { e =>
-          handleException(e, messageWithImageAsCausal)
-          "No images found (due to exception thrown)."
-        }.getOrElse("No images found.")
+          handleException(e, messageWithImage)
+          "No images found (due to exception thrown)"
+        }.getOrElse("No images found")
 
         val (additionalResults, previewBlanks) = result.additionalIqdbResults.reverse.map { iqdbResult =>
           val index = iqdbResult.index + 1
@@ -165,16 +165,22 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
           (newResult, newPreviewBlanks)
         }
 
-        val messageText = if (additionalResults.isEmpty) {
-          notFoundMessage
-        } else if (query) {
-          s"Results:\n$additionalResults"
+        val messageTextFuture = if (additionalResults.isEmpty) {
+          Future.successful(s"$notFoundMessage.")
         } else {
-          s"$notFoundMessage\n\nAdditional results:\n$additionalResults"
+          storeMessageToWorkspace(messageWithImage).map { requestIdString =>
+            val insert = requestIdString.map(" " + _).getOrElse("")
+            if (query) {
+              s"Results $insert:\n$additionalResults"
+            } else {
+              s"$notFoundMessage${insert}.\n\nAdditional results:\n$additionalResults"
+            }
+          }
         }
 
         throw (if (additionalResults.isEmpty) result.exception else None)
-          .getOrElse(new RecoverException(replyWithQueryList(messageText, previewBlanks)))
+          .getOrElse(new RecoverException(messageTextFuture
+            .flatMap(replyWithQueryList(messageWithImage, _, previewBlanks))))
       }
     }
 
@@ -222,7 +228,8 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         .getOrElse(Future.successful(imageData, messageWithImage))
     }
 
-    def replyWithQueryList(messageText: String, previewBlanks: List[PreviewBlank]): Future[Message] = {
+    def replyWithQueryList(messageWithImage: Message, messageText: String,
+      previewBlanks: List[PreviewBlank]): Future[Message] = {
       if (previewBlanks.nonEmpty) {
         previewBlanks.map { previewBlank =>
           previewBlank.url.map { previewUrl =>
@@ -231,7 +238,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
                 Utils.Preview(previewBlank.index, Some(response.body), "image/jpeg", previewBlank.blurMode)
               }
             }.recover { case e =>
-              handleException(e, messageWithImageAsCausal)
+              handleException(e, messageWithImage)
               Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)
             }
           }.getOrElse(Future.successful(Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)))
@@ -247,6 +254,42 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
       } else {
         replyQuote(messageText)
       }
+    }
+
+    def storeMessageToWorkspace(messageWithImage: Message): Future[Option[String]] = {
+      workspace.map { workspace =>
+        request(ForwardMessage(Left(workspace), Left(messageWithImage.chat.id), None, messageWithImage.messageId))
+          .map(m => Some(s"[request ${m.messageId}]"))
+          .recover {
+          case e: Throwable =>
+            handleException(e, message)
+            None
+        }
+      }.getOrElse(Future.successful(None))
+    }
+
+    def extractMessageFromWorkspace(message: Message): Future[Option[Message]] = {
+      workspace.map { workspace =>
+        bot.flatMap { bot =>
+          if (message.from.map(_.id.toLong).contains(bot.id)) {
+            (message.text orElse message.caption)
+              .flatMap("\\[request (-?\\d+)\\]".r.findFirstMatchIn)
+              .flatMap(_.subgroups.headOption)
+              .map(_.toLong)
+              .map { messageId =>
+                request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
+                  .map(_.replyToMessage)
+                  .recover {
+                  case e: Throwable =>
+                    handleException(e, message)
+                    None
+                }
+              }.getOrElse(Future.successful(None))
+          } else {
+            Future.successful(None)
+          }
+        }
+      }.getOrElse(Future.successful(None))
     }
 
     def configureItem(userId: Long, minSimilarity: Option[Int], priority: Option[List[String]], reset: Boolean)
@@ -366,7 +409,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         IqdbConfigurationData.get(userId)
           .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
-          .recoverWith(handleError(message, "configuration handling"))
+          .recoverWith(handleError("configuration handling")(message))
       }.getOrElse(Future.unit)
     } else {
       val indexOption = arguments.int("i", "index")
@@ -375,12 +418,21 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)
 
-      Future(obtainMessageFile(commands.head, messageWithImage)).flatMap(readTelegramFile)
-        .flatMap(withConfiguration(sendIqdbRequest, similarity))
-        .flatMap(withConfiguration(applyPriority, priority))
-        .map(filterByIndex(indexOption)).map(readBooruImages(query))
-        .flatMap(replyWithImage(!tags)).flatMap((replyWithTags(tags) _).tupled)
-        .recoverWith(handleError(messageWithImageAsCausal, "image request"))
+      val messageWithImageFuture = message.replyToMessage
+        .map(extractMessageFromWorkspace)
+        .getOrElse(Future.successful(None))
+        .map(_ orElse extractMessageWithImage)
+
+      messageWithImageFuture
+        .map(obtainMessageFile(commands.head))
+        .scopeFlatMap((messageWithImage, file) => readTelegramFile(file)
+          .flatMap(withConfiguration(sendIqdbRequest, similarity))
+          .flatMap(withConfiguration(applyPriority, priority))
+          .map(filterByIndex(indexOption))
+          .map(readBooruImages(messageWithImage, query))
+          .flatMap(replyWithImage(!tags))
+          .flatMap((replyWithTags(tags) _).tupled))
+        .recoverWith[Any](message)(handleError("image request"))
     }
   }
 }

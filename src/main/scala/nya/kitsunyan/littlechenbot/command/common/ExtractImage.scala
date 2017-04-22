@@ -8,14 +8,11 @@ import info.mukel.telegrambot4s.models._
 import scalaj.http.MultiPart
 
 import scala.concurrent.Future
+import scala.language.implicitConversions
 
 trait ExtractImage extends Command with Http {
-  def messageWithImage(implicit message: Message): Option[Message] = {
+  def extractMessageWithImage(implicit message: Message): Option[Message] = {
     message.caption.map(_ => message) orElse message.replyToMessage
-  }
-
-  def messageWithImageAsCausal(implicit message: Message): Message = {
-    messageWithImage.getOrElse(message)
   }
 
   def extractFile(message: Message): Option[String] = {
@@ -40,13 +37,11 @@ trait ExtractImage extends Command with Http {
     }
   }
 
-  def obtainMessageFile(command: String, messageWithImage: Option[Message]): String = {
-    messageWithImage.flatMap(extractFile) match {
-      case Some(file) => file
-      case None =>
-        throw new CommandException("Please reply to message with image or send image with command in caption.\n\n" +
-          "Remember I can't see other bots' messages even when you reply them!\n\n" +
-          s"Type `/$command --help` for more information.", Some(ParseMode.Markdown))
+  def obtainMessageFile(command: String)(messageWithImage: Option[Message]): (Message, String) = {
+    messageWithImage.flatMap(m => extractFile(m).map((m, _))).getOrElse {
+      throw new CommandException("Please reply to message with image or send image with command in caption.\n\n" +
+        "Remember I can't see other bots' messages even when you reply them!\n\n" +
+        s"Type `/$command --help` for more information.", Some(ParseMode.Markdown))
     }
   }
 
@@ -99,5 +94,23 @@ trait ExtractImage extends Command with Http {
         }
       }
     }
+  }
+
+  class RecoverableFuture[A, B, R](future: Future[(A, B)], callback: (A, B) => Future[R]) {
+    def recoverWith[T >: R](defaultValue: A)(recover: A => PartialFunction[Throwable, Future[T]]): Future[T] = {
+      future.flatMap { case (a, b) =>
+        callback(a, b).recoverWith(recover(a))
+      }.recoverWith(recover(defaultValue))
+    }
+  }
+
+  class ScopeFuture[A, B](future: Future[(A, B)]) {
+    def scopeFlatMap[R](callback: (A, B) => Future[R]): RecoverableFuture[A, B, R] = {
+      new RecoverableFuture(future, callback)
+    }
+  }
+
+  implicit def recoverableScopeFuture[A, B](future: Future[(A, B)]): ScopeFuture[A, B] = {
+    new ScopeFuture(future)
   }
 }

@@ -45,12 +45,15 @@ Available properties:
 
 * `bot.token` — Telegram API token (String, required)
 * `bot.owner` — Bot owner ID to log errors (Long)
+* `bot.workspace` — Chat ID for bot's internal storage (Long)
 * `bot.chats` — List of allowed chat IDs (list of Long values)
 * `bot.chatsAnyPrivate` — Allows to reply to all private chats (Boolean)
 * `bot.chatsAnyGroup` — Allows to reply to all group chats (Boolean)
 * `bot.proxy.host` — Proxy host (String)
 * `bot.proxy.port` — Proxy port (Int)
 * `bot.proxy.type` — Proxy type: http, socks, direct (String)
+
+A `bot.workspace` parameter allows to save some data using chat messages. A special chat should be created for a bot where it will send messages and obtain them later. It's possible in Telegtam to create a group and leave it then leaving only a bot in the chat.
 
 Example configuration:
 

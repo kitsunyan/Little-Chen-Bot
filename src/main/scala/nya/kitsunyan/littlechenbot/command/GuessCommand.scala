@@ -260,7 +260,7 @@ trait GuessCommand extends Command with Describable with Http {
         .getOrElse(Nil)
 
       Future(queryImages(tags)).map(readRandomImage(tags)).flatMap((createSession _).tupled)
-        .recoverWith(handleError(message, "creating a session"))
+        .recoverWith(handleError("creating a session")(message))
     }
   }
 }

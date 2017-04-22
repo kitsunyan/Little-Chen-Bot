@@ -28,7 +28,8 @@ object BotApplication extends App {
   object ShikigamiBot extends TelegramBot with Polling with HelpCommand with IqdbCommand with RateCommand
     with GuessCommand with IdentityCommand {
     override def token: String = config.getString("bot.token")
-    override val botNickname: Future[String] = request(GetMe).map(_.username.getOrElse(""))
+    override val bot: Future[Bot] = request(GetMe).map(m => Bot(m.username.getOrElse(""), m.id))
+    override val workspace: Option[Long] = config(_.getLong, "bot.workspace")
 
     private val botOwner = config(_.getLong, "bot.owner")
     private val chats = config(_.getLongList, "bot.chats").getOrElse(java.util.Collections.emptyList)
