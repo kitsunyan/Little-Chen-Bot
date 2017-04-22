@@ -108,4 +108,18 @@ trait Command extends BotBase with AkkaDefaults {
     val text = if (argumentsListText.nonEmpty) s"$description\n$argumentsListText" else description
     replyQuote(text, Some(ParseMode.Markdown))
   }
+
+  def trimCaption(caption: String): String = {
+    // 200 is maximum caption length for Telegram
+    if (caption.length > 200) {
+      val index = caption.lastIndexOf('\n', 200)
+      if (index >= 0) {
+        caption.substring(0, index)
+      } else {
+        caption
+      }
+    } else {
+      caption
+    }
+  }
 }

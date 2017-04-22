@@ -241,7 +241,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
           val preview = Utils.drawPreview(list)
           preview.map { preview =>
             request(SendPhoto(Left(message.sender), Left(InputFile("preview.png", preview)),
-              replyToMessageId = Some(message.messageId), caption = Some(messageText)))
+              replyToMessageId = Some(message.messageId), caption = Some(trimCaption(messageText))))
           }.getOrElse(replyQuote(messageText))
         }
       } else {
