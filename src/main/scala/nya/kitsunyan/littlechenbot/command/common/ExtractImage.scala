@@ -55,7 +55,7 @@ trait ExtractImage extends Command with Http {
   }
 
   private def readExternalFile(file: String, readMeta: Boolean): Either[TelegramFile, String] = {
-    http(file, proxy = true).response(_.asBytes) { response => body =>
+    http(file, proxy = true).response(_.asBytes) { response =>
       val contentType = response.headers.get("Content-Type").flatMap(_.headOption).map { contentType =>
         val index = contentType.indexOf(';')
         if (index >= 0) contentType.substring(0, index) else contentType
@@ -64,9 +64,9 @@ trait ExtractImage extends Command with Http {
       def unable: Nothing = throw new CommandException("Unable to fetch the file by URL.")
 
       contentType match {
-        case Some(mimeType) if mimeType.startsWith("image/") => Left(TelegramFile(body, mimeType))
+        case Some(mimeType) if mimeType.startsWith("image/") => Left(TelegramFile(response.body, mimeType))
         case Some("text/html") if readMeta =>
-          val responseString = new String(body, "ISO-8859-1")
+          val responseString = new String(response.body, "ISO-8859-1")
           "<meta property=\"og:image\" content=\"(.*?)\".*?>".r
             .findFirstMatchIn(responseString)
             .flatMap(_.subgroups.headOption)

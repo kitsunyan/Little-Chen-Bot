@@ -28,7 +28,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
       http("https://iqdb.org/")
         .postMulti(telegramFile.multiPart("file"))
-        .params(BooruService.list.map("service[]" -> _.iqdbId)).response(_.asString) { _ => body =>
+        .params(BooruService.list.map("service[]" -> _.iqdbId)).response(_.asString) { response =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
           "(?:<img src='(.*?)'.*?)?(?:<td>\\d+×\\d+ \\[(\\w+)\\]</td>.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
@@ -37,7 +37,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
           booruService: BooruService, similarity: Int, matches: Boolean)
 
         val results = for {
-          table <- tablePattern.findAllIn(body).matchData
+          table <- tablePattern.findAllIn(response.body).matchData
           similarity = table.group(3).toInt
           previewUrl = Option(table.group(1)).map {
             case i if i.startsWith("//") => "https:" + i
@@ -111,8 +111,8 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         .map(iqdbResult.booruService.replaceDomain(pageUrl, _))
         .getOrElse(pageUrl)
 
-      http(pageUrl, proxy = true).response(_.asString) { _ => body =>
-        iqdbResult.booruService.parseHtml(body) match {
+      http(pageUrl, proxy = true).response(_.asString) { response =>
+        iqdbResult.booruService.parseHtml(response.body) match {
           case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new Exception(s"Not parsed: $pageUrl.")
         }
@@ -120,7 +120,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
     }
 
     def readBooruImage(imageData: ImageData): ReadImageData = {
-      http(imageData.url, proxy = true).response(_.asBytes) { _ => body =>
+      http(imageData.url, proxy = true).response(_.asBytes) { response =>
         val name = {
           val url = imageData.url
           val start = url.lastIndexOf('/') + 1
@@ -128,7 +128,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
           if (end >= start) url.substring(start, end) else url.substring(start)
         }
 
-        ReadImageData(name, body)(imageData.pageUrlFunction, imageData.tags)
+        ReadImageData(name, response.body)(imageData.pageUrlFunction, imageData.tags)
       }
     }
 
@@ -227,8 +227,8 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         previewBlanks.map { previewBlank =>
           previewBlank.url.map { previewUrl =>
             Future {
-              http(previewUrl).response(_.asBytes) { _ => body =>
-                Utils.Preview(previewBlank.index, Some(body), "image/jpeg", previewBlank.blurMode)
+              http(previewUrl).response(_.asBytes) { response =>
+                Utils.Preview(previewBlank.index, Some(response.body), "image/jpeg", previewBlank.blurMode)
               }
             }.recover { case e =>
               handleException(e, messageWithImageAsCausal)
