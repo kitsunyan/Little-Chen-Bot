@@ -271,7 +271,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
     def extractMessageFromWorkspace(message: Message): Future[Option[Message]] = {
       workspace.map { workspace =>
         bot.flatMap { bot =>
-          if (message.from.map(_.id.toLong).contains(bot.id)) {
+          if ((message.forwardFrom orElse message.from).map(_.id.toLong).contains(bot.id)) {
             (message.text orElse message.caption)
               .flatMap("\\[request (-?\\d+)\\]".r.findFirstMatchIn)
               .flatMap(_.subgroups.headOption)
