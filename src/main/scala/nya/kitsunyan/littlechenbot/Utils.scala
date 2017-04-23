@@ -28,12 +28,12 @@ object Utils {
     }
   }
 
-  sealed trait BlurMode
+  sealed abstract class BlurMode(val color: String)
 
   object BlurMode {
-    case object No extends BlurMode
-    case object Soft extends BlurMode
-    case object Hard extends BlurMode
+    case object No extends BlurMode("#88bbee")
+    case object Soft extends BlurMode("#ffee88")
+    case object Hard extends BlurMode("#ff6688")
   }
 
   case class Preview(index: Int, image: Option[Array[Byte]], mimeType: String, blurMode: BlurMode) {
@@ -64,7 +64,6 @@ object Utils {
 
       val backgroundColor = "#303336"
       val imageBackgroundColor = "#40444a"
-      val indexCircleColor = "#88bbee"
       val indexTextColor = "#222222"
 
       Some(previews.map { preview =>
@@ -90,9 +89,9 @@ object Utils {
           }
         }
 
-        (preview.index, newImage)
+        (preview.index, newImage, preview.blurMode.color)
       }.foldLeft(exec(None, Array("convert", "-size", s"${totalWidth}x${totalHeight}",
-        s"canvas:$backgroundColor", "png:-")), 0) { case ((result, i), (index, image)) =>
+        s"canvas:$backgroundColor", "png:-")), 0) { case ((result, i), (index, image, indexCircleColor)) =>
         // Draw each image on canvas
         (image.map { image =>
           val file = java.io.File.createTempFile("littlechenbot", null)
