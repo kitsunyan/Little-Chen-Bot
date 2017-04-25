@@ -10,6 +10,9 @@ trait Http {
   type Headers = Map[String, IndexedSeq[String]]
   type HttpFilter = (String, Int, Headers) => Unit
 
+  class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
+    with UserMessageException
+
   object HttpFilters {
     def any: HttpFilter = (_, _, _) => ()
 
@@ -18,7 +21,8 @@ trait Http {
     def code(validCodes: Int*): HttpFilter = {
       (url, code, _) => {
         if (!validCodes.contains(code)) {
-          throw new Exception(s"Invalid response: [$code] $url.")
+          val userMessage = s"Invalid response: [$code]"
+          throw new HttpException(Some(s"$userMessage."), s"$userMessage $url.")
         }
       }
     }
@@ -30,7 +34,8 @@ trait Http {
           .map(_.toLong)
           .find(_ > maxContentLength)
           .foreach { contentLength =>
-          throw new Exception(s"Response is too large: [$contentLength] $url.")
+          val userMessage = s"Response is too large: [$contentLength]"
+          throw new HttpException(Some(s"$userMessage."), s"$userMessage $url.")
         }
       }
     }
