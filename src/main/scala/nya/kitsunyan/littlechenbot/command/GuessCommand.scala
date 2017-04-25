@@ -109,7 +109,8 @@ trait GuessCommand extends Command with Describable with Http {
 
     def readBooruImage(url: String): Option[(String, Array[Byte])] = {
       try {
-        http(url, proxy = true).response(_.asBytes) { response =>
+        http(url, proxy = true)
+          .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
           val name = {
             val start = url.lastIndexOf('/') + 1
             val end = url.indexOf('?', start)
@@ -183,14 +184,14 @@ trait GuessCommand extends Command with Describable with Http {
       val url = "http://gelbooru.com/index.php?page=post&s=list&tags=" +
         java.net.URLEncoder.encode(fullTags.reduce(_ + " " + _), "UTF-8")
 
-      http(url, proxy = true).response(_.asString) { response =>
+      http(url, proxy = true).runString(HttpFilters.ok) { response =>
         val maxPage = "<a href=\".*?pid=(\\d+)\">\\d+</a>".r
           .findAllIn(response.body).matchData.map(_.subgroups)
           .map(_.head.toInt).fold(0)(math.max)
         val page = Random.nextInt(maxPage + 1)
 
         val pageUrls = if (page > 0) {
-          val newBody = http(s"$url&pid=$page", proxy = true).response(_.asString)(_.body)
+          val newBody = http(s"$url&pid=$page", proxy = true).runString(HttpFilters.ok)(_.body)
           GelbooruService.parseListHtml(newBody)
         } else {
           Nil
@@ -213,7 +214,7 @@ trait GuessCommand extends Command with Describable with Http {
 
       val result = Random.shuffle(urls).foldLeft(Result()) { (result, pageUrl) =>
         if (result.success.isEmpty) {
-          http(pageUrl, proxy = true).response(_.asString) { response =>
+          http(pageUrl, proxy = true).runString(HttpFilters.ok) { response =>
             try {
               val data = GelbooruService.parseHtml(response.body).flatMap { case (url, tags) =>
                 val workTags = tags.filter(t => !exclude.contains(t.title))

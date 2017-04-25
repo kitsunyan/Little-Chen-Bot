@@ -28,7 +28,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
     def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
       http("https://iqdb.org/")
         .postMulti(telegramFile.multiPart("file"))
-        .params(BooruService.list.map("service[]" -> _.iqdbId)).response(_.asString) { response =>
+        .params(BooruService.list.map("service[]" -> _.iqdbId)).runString(HttpFilters.ok) { response =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
           "(?:<img src='(.*?)'.*?)?(?:<td>\\d+×\\d+ \\[(\\w+)\\]</td>.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
@@ -111,7 +111,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         .map(iqdbResult.booruService.replaceDomain(pageUrl, _))
         .getOrElse(pageUrl)
 
-      http(pageUrl, proxy = true).response(_.asString) { response =>
+      http(pageUrl, proxy = true).runString(HttpFilters.ok) { response =>
         iqdbResult.booruService.parseHtml(response.body) match {
           case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new Exception(s"Not parsed: $pageUrl.")
@@ -120,7 +120,8 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
     }
 
     def readBooruImage(imageData: ImageData): ReadImageData = {
-      http(imageData.url, proxy = true).response(_.asBytes) { response =>
+      http(imageData.url, proxy = true)
+        .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
         val name = {
           val url = imageData.url
           val start = url.lastIndexOf('/') + 1
@@ -234,7 +235,7 @@ trait IqdbCommand extends Command with Describable with ExtractImage with Http {
         previewBlanks.map { previewBlank =>
           previewBlank.url.map { previewUrl =>
             Future {
-              http(previewUrl).response(_.asBytes) { response =>
+              http(previewUrl).runBytes(HttpFilters.ok) { response =>
                 Utils.Preview(previewBlank.index, Some(response.body), "image/jpeg", previewBlank.blurMode)
               }
             }.recover { case e =>

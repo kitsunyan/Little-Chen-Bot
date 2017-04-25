@@ -50,7 +50,8 @@ trait ExtractImage extends Command with Http {
   }
 
   private def readExternalFile(file: String, readMeta: Boolean): Either[TelegramFile, String] = {
-    http(file, proxy = true).response(_.asBytes) { response =>
+    http(file, proxy = true)
+      .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
       val contentType = response.headers.get("Content-Type").flatMap(_.headOption).map { contentType =>
         val index = contentType.indexOf(';')
         if (index >= 0) contentType.substring(0, index) else contentType
@@ -85,7 +86,8 @@ trait ExtractImage extends Command with Http {
           case Some(path) =>
             val data = {
               val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-              val data = http(telegramImageUrl).asBytes.body
+              val data = http(telegramImageUrl)
+                .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(_.body)
               (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
             }
             val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"

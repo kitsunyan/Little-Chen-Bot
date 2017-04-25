@@ -38,7 +38,7 @@ trait RateCommand extends Command with Describable with ExtractImage with Http {
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
     def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
       http("https://services2.microstock.pro/aesthetics/quality")
-        .postMulti(telegramFile.multiPart("data")).response(_.asString) { response =>
+        .postMulti(telegramFile.multiPart("data")).runString(HttpFilters.ok) { response =>
         parse(response.body) \ "quality" \ "score" match {
           case JDouble(rating) => rating.toFloat
           case _ => throw new CommandException("Invalid server response.")
