@@ -1,5 +1,7 @@
 package nya.kitsunyan.littlechenbot.command.common
 
+import nya.kitsunyan.littlechenbot.util.UserMessageException
+
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -15,6 +17,10 @@ trait Command extends BotBase with AkkaDefaults {
   case class FilterChat(soft: Boolean, hard: Boolean)
 
   def filterChat(message: Message): FilterChat = FilterChat(true, true)
+
+  case class Description(commands: List[String], text: String)
+
+  def prependDescription(list: List[Description]): List[Description] = list
 
   def handleException(e: Throwable, causalMessage: Message): Unit
 

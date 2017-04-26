@@ -1,5 +1,7 @@
 package nya.kitsunyan.littlechenbot.command.common
 
+import nya.kitsunyan.littlechenbot.util.UserMessageException
+
 import scalaj.http._
 
 import scala.language.implicitConversions

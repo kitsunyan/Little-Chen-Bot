@@ -1,4 +1,4 @@
-package nya.kitsunyan.littlechenbot.command.common
+package nya.kitsunyan.littlechenbot.util
 
 trait UserMessageException {
   this: Throwable =>

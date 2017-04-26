@@ -1,6 +1,6 @@
 package nya.kitsunyan.littlechenbot.service
 
-import nya.kitsunyan.littlechenbot.Utils
+import nya.kitsunyan.littlechenbot.util.Utils
 
 import scala.util.matching.Regex
 

@@ -16,7 +16,9 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.Random
 
-trait GuessCommand extends Command with Describable with Http {
+trait GuessCommand extends Command {
+  this: Http =>
+
   private val commands = List("guess")
 
   override def prependDescription(list: List[Description]): List[Description] = {

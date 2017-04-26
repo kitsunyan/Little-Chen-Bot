@@ -1,16 +1,18 @@
 package nya.kitsunyan.littlechenbot.command
 
-import nya.kitsunyan.littlechenbot.Utils
 import nya.kitsunyan.littlechenbot.command.common._
 import nya.kitsunyan.littlechenbot.database.IqdbConfigurationData
 import nya.kitsunyan.littlechenbot.service.BooruService
+import nya.kitsunyan.littlechenbot.util.Utils
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
-trait IqdbCommand extends Command with Describable with ExtractImage with Http {
+trait IqdbCommand extends Command with ExtractImage {
+  this: Http =>
+
   private val commands = List("iqdb")
 
   override def prependDescription(list: List[Description]): List[Description] = {

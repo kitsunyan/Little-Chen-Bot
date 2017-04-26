@@ -1,6 +1,6 @@
 package nya.kitsunyan.littlechenbot.command.common
 
-import nya.kitsunyan.littlechenbot.Utils
+import nya.kitsunyan.littlechenbot.util.Utils
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -10,7 +10,9 @@ import scalaj.http.MultiPart
 import scala.concurrent.Future
 import scala.language.implicitConversions
 
-trait ExtractImage extends Command with Http {
+trait ExtractImage {
+  this: Command with Http =>
+
   def extractMessageWithImage(implicit message: Message): Option[Message] = {
     message.caption.map(_ => message) orElse message.replyToMessage
   }

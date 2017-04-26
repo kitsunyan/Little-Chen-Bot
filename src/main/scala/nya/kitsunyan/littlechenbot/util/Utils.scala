@@ -1,4 +1,4 @@
-package nya.kitsunyan.littlechenbot
+package nya.kitsunyan.littlechenbot.util
 
 object Utils {
   private def exec(data: Option[Array[Byte]], commands: Array[String]): Array[Byte] = {

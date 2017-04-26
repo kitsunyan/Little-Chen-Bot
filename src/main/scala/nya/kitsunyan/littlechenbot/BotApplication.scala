@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot
 
 import nya.kitsunyan.littlechenbot.command._
+import nya.kitsunyan.littlechenbot.command.common.Http
 
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
@@ -25,7 +26,7 @@ object BotApplication extends App {
     }
   }
 
-  object ShikigamiBot extends TelegramBot with Polling with HelpCommand with IqdbCommand with RateCommand
+  object ShikigamiBot extends TelegramBot with Polling with Http with HelpCommand with IqdbCommand with RateCommand
     with GuessCommand with IdentityCommand {
     override def token: String = config.getString("bot.token")
     override val bot: Future[Bot] = request(GetMe).map(m => Bot(m.username.getOrElse(""), m.id))
