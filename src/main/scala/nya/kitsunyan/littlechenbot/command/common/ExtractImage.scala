@@ -88,7 +88,7 @@ trait ExtractImage {
           case Some(path) =>
             val data = {
               val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-              val data = http(telegramImageUrl)
+              val data = http(telegramImageUrl).withPrivateUrl(true)
                 .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(_.body)
               (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
             }

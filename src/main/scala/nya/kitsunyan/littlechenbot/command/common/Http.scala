@@ -10,44 +10,46 @@ trait Http {
   def http(url: String, proxy: Boolean = false): HttpRequest
 
   type Headers = Map[String, IndexedSeq[String]]
-  type HttpFilter = (String, Int, Headers) => Unit
+  type HttpFilter = (String, Boolean, Int, Headers) => Unit
 
   class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
     with UserMessageException
 
   object HttpFilters {
-    def any: HttpFilter = (_, _, _) => ()
+    def any: HttpFilter = (_, _, _, _) => ()
 
     def ok: HttpFilter = code(200)
 
     def code(validCodes: Int*): HttpFilter = {
-      (url, code, _) => {
+      (url, privateUrl, code, _) => {
         if (!validCodes.contains(code)) {
-          val userMessage = s"Invalid response: [$code]"
-          throw new HttpException(Some(s"$userMessage."), s"$userMessage $url.")
+          throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$code]")
         }
       }
     }
 
     def contentLength(maxContentLength: Long): HttpFilter = {
-      (url, _, headers) => {
+      (url, privateUrl, _, headers) => {
         headers.get("Content-Length")
           .flatMap(_.headOption)
           .map(_.toLong)
           .find(_ > maxContentLength)
-          .foreach { contentLength =>
-          val userMessage = s"Response is too large: [$contentLength]"
-          throw new HttpException(Some(s"$userMessage."), s"$userMessage $url.")
-        }
+          .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
       }
+    }
+
+    private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
+      val publicMessage = s"$commonMessage."
+      val privateMessage = s"$commonMessage $url."
+      throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage)
     }
   }
 
   class ExtendedHttpFilter(filter: HttpFilter) {
     def &&(anotherFilter: HttpFilter): HttpFilter = {
-      (url, code, header) => {
-        filter(url, code, header)
-        anotherFilter(url, code, header)
+      (url, privateUrl, code, header) => {
+        filter(url, privateUrl, code, header)
+        anotherFilter(url, privateUrl, code, header)
       }
     }
   }
@@ -56,11 +58,11 @@ trait Http {
     new ExtendedHttpFilter(filter)
   }
 
-  class ExtendedHttpRequest(request: HttpRequest) {
-    def run[T, R](filter: HttpFilter)(callback: HttpResponse[T] => R)
+  class ExtendedHttpRequest(request: HttpRequest, privateUrl: Boolean) {
+    private def run[T, R](filter: HttpFilter)(callback: HttpResponse[T] => R)
       (parser: (Headers, java.io.InputStream) => T): R = {
       callback(request.exec { (code, headers, stream) =>
-        filter(request.url, code, headers)
+        filter(request.url, privateUrl, code, headers)
         parser(headers, stream)
       })
     }
@@ -78,9 +80,13 @@ trait Http {
     def runBytes[R](filter: HttpFilter)(callback: HttpResponse[Array[Byte]] => R): R = {
       run(filter)(callback)((_, stream) => HttpConstants.readBytes(stream))
     }
+
+    def withPrivateUrl(privateUrl: Boolean): ExtendedHttpRequest = {
+      new ExtendedHttpRequest(request, privateUrl)
+    }
   }
 
   implicit def extendHttpRequest(request: HttpRequest): ExtendedHttpRequest = {
-    new ExtendedHttpRequest(request)
+    new ExtendedHttpRequest(request, false)
   }
 }
