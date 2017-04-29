@@ -157,25 +157,33 @@ trait GoogleCommand extends Command with ExtractImage {
       }.getOrElse(throw new CommandException("No images found."))
     }
 
-    def replyWithImage(imageData: ImageData): Future[Message] = {
-      request(SendPhoto(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
-        replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
+    def replyWithImage(asDocument: Boolean)(imageData: ImageData): Future[Message] = {
+      if (asDocument) {
+        request(SendDocument(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
+          replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
+      } else {
+        request(SendPhoto(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
+          replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
+      }
     }
 
     if (arguments.string("h", "help").nonEmpty) {
       replyMan("Search image using images.google.com.",
         (List("-i", "--index"), None,
           "Fetch image by index. Only available when I've already found anything.") ::
+        (List("-d", "--as-document"), None,
+          "Fetch image as document in original quality.") ::
         (List("-h", "--help"), None,
           "Display this help.") ::
         Nil)
     } else {
       val indexOption = arguments.int("i", "index")
+      val asDocument = arguments.string("d", "as-document").nonEmpty
 
       indexOption.map { index =>
         extractUrlsListFromWorkspace
           .map(fetchImageByIndex(index))
-          .flatMap(replyWithImage)
+          .flatMap(replyWithImage(asDocument))
           .recoverWith(handleError("image request")(message))
       } getOrElse {
         Future(obtainMessageFile(commands.head)(extractMessageWithImage))
