@@ -57,17 +57,19 @@ object BotApplication extends App {
       }
     }
 
-    override def handleException(e: Throwable, causalMessage: Message): Unit = {
+    override def handleException(e: Throwable, causalMessage: Option[Message]): Unit = {
       e.printStackTrace()
-      botOwner.map { botOwner =>
-        request(ForwardMessage(Left(botOwner), Left(causalMessage.chat.id),
-          Some(true), causalMessage.messageId)).flatMap { sentMessage =>
-          val writer = new StringWriter()
-          e.printStackTrace(new PrintWriter(writer))
-          request(SendMessage(Left(botOwner), "```\n" + writer.toString + "\n```", Some(ParseMode.Markdown),
-            Some(true), Some(true), Some(sentMessage.messageId)))
-        }.recover {
-          case e => e.printStackTrace()
+      causalMessage.foreach { causalMessage =>
+        botOwner.map { botOwner =>
+          request(ForwardMessage(Left(botOwner), Left(causalMessage.chat.id),
+            Some(true), causalMessage.messageId)).flatMap { sentMessage =>
+            val writer = new StringWriter()
+            e.printStackTrace(new PrintWriter(writer))
+            request(SendMessage(Left(botOwner), "```\n" + writer.toString + "\n```", Some(ParseMode.Markdown),
+              Some(true), Some(true), Some(sentMessage.messageId)))
+          }.recover {
+            case e => e.printStackTrace()
+          }
         }
       }
     }

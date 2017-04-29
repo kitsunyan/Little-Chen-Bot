@@ -22,7 +22,7 @@ trait Command extends BotBase with AkkaDefaults {
 
   def prependDescription(list: List[Description]): List[Description] = list
 
-  def handleException(e: Throwable, causalMessage: Message): Unit
+  def handleException(e: Throwable, causalMessage: Option[Message]): Unit
 
   def handleError(kind: String)(causalMessage: Message)(implicit message: Message):
     PartialFunction[Throwable, Future[Any]] = {
@@ -35,7 +35,7 @@ trait Command extends BotBase with AkkaDefaults {
   }
 
   def handleErrorCommon(e: Exception, causalMessage: Message, kind: String)(implicit message: Message): Future[Any] = {
-    handleException(e, causalMessage)
+    handleException(e, Some(causalMessage))
     val userMessage = (e match {
       case e: UserMessageException => e.userMessage
       case _ => None
@@ -81,7 +81,7 @@ trait Command extends BotBase with AkkaDefaults {
 
   final override def onMessage(message: Message): Unit = {
     handleMessage(filterChat(message))(message).recover {
-      case e => handleException(e, message)
+      case e => handleException(e, Some(message))
     }
   }
 

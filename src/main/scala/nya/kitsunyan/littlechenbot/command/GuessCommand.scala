@@ -123,7 +123,7 @@ trait GuessCommand extends Command {
         }
       } catch {
         case e: Exception =>
-          handleException(e, message)
+          handleException(e, Some(message))
           None
       }
     }

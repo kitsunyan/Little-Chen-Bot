@@ -153,7 +153,7 @@ trait IqdbCommand extends Command with ExtractImage {
 
       result.successImageData.getOrElse {
         val notFoundMessage = result.exception.map { e =>
-          handleException(e, messageWithImage)
+          handleException(e, Some(messageWithImage))
           "No images found (due to exception thrown)"
         }.getOrElse("No images found")
 
@@ -241,7 +241,7 @@ trait IqdbCommand extends Command with ExtractImage {
                 Utils.Preview(previewBlank.index, Some(response.body), "image/jpeg", previewBlank.blurMode)
               }
             }.recover { case e =>
-              handleException(e, messageWithImage)
+              handleException(e, Some(messageWithImage))
               Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)
             }
           }.getOrElse(Future.successful(Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)))
@@ -265,7 +265,7 @@ trait IqdbCommand extends Command with ExtractImage {
           .map(m => Some(s"[request ${m.messageId}]"))
           .recover {
           case e: Throwable =>
-            handleException(e, message)
+            handleException(e, Some(message))
             None
         }
       }.getOrElse(Future.successful(None))
@@ -284,7 +284,7 @@ trait IqdbCommand extends Command with ExtractImage {
                   .map(_.replyToMessage)
                   .recover {
                   case e: Throwable =>
-                    handleException(e, message)
+                    handleException(e, Some(message))
                     None
                 }
               }.getOrElse(Future.successful(None))
