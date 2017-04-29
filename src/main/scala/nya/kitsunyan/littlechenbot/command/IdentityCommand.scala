@@ -7,7 +7,7 @@ import info.mukel.telegrambot4s.models._
 import scala.concurrent.Future
 
 trait IdentityCommand extends Command {
-  private val commands = List("identity")
+  private val commands = List("identity", "id")
 
   override def prependDescription(list: List[Description]): List[Description] = {
     super.prependDescription(Description(commands, "who are you?") :: list)
