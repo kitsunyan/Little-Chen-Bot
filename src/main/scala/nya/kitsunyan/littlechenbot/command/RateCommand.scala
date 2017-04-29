@@ -2,9 +2,6 @@ package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
 
-import org.json4s._
-import org.json4s.jackson.JsonMethods._
-
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
@@ -41,6 +38,9 @@ trait RateCommand extends Command with ExtractImage {
     def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
       http("https://quality.api.everypixel.com/v1/quality")
         .postMulti(telegramFile.multiPart("data")).runString(HttpFilters.ok) { response =>
+        import org.json4s._
+        import org.json4s.jackson.JsonMethods._
+
         parse(response.body) \ "quality" \ "score" match {
           case JDouble(rating) => rating.toFloat
           case _ => throw new CommandException("Invalid server response.")

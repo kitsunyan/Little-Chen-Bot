@@ -280,14 +280,14 @@ trait IqdbCommand extends Command with ExtractImage {
               .flatMap(_.subgroups.headOption)
               .map(_.toLong)
               .map { messageId =>
-                request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
-                  .map(_.replyToMessage)
-                  .recover {
-                  case e: Throwable =>
-                    handleException(e, Some(message))
-                    None
-                }
-              }.getOrElse(Future.successful(None))
+              request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
+                .map(_.replyToMessage)
+                .recover {
+                case e: Throwable =>
+                  handleException(e, Some(message))
+                  None
+              }
+            }.getOrElse(Future.successful(None))
           } else {
             Future.successful(None)
           }
