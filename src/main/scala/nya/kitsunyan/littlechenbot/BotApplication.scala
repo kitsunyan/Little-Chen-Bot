@@ -74,15 +74,20 @@ object BotApplication extends App {
       }
     }
 
+    private object BotHttp extends BaseHttp(options = Seq(HttpOptions.followRedirects(true),
+      HttpOptions.connTimeout(10000), HttpOptions.readTimeout(10000)),
+      userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
+
     override def http(url: String, proxy: Boolean): HttpRequest = {
-      Some(Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 10000)
-        .option(HttpOptions.followRedirects(true))).map { request =>
-        (if (proxy) ShikigamiBot.proxy else None)
-          .map((request.proxy(_: String, _: Int, _: java.net.Proxy.Type)).tupled)
-          .getOrElse(request)
-      }.get
+      val baseRequest = BotHttp(url)
+      (if (proxy) ShikigamiBot.proxy else None)
+        .map((baseRequest.proxy(_: String, _: Int, _: java.net.Proxy.Type)).tupled)
+        .getOrElse(baseRequest)
     }
   }
+
+  // noinspection ScalaDeprecation
+  java.net.URL.setURLStreamHandlerFactory(new okhttp3.OkUrlFactory(new okhttp3.OkHttpClient))
 
   ShikigamiBot.run()
 }

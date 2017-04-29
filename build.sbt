@@ -8,7 +8,7 @@ scalaVersion := "2.12.1"
 
 scalacOptions :=
   "-unchecked" ::
-  "-deprecation" ::
+  "-deprecation:false" ::
   "-feature" ::
   Nil
 
@@ -21,6 +21,7 @@ libraryDependencies ++=
   "org.json4s" %% "json4s-jackson" % "3.5.0" ::
   "org.xerial" % "sqlite-jdbc" % "3.16.1" ::
   "com.typesafe.slick" %% "slick" % "3.2.0" ::
+  "com.squareup.okhttp3" % "okhttp-urlconnection" % "3.7.0" ::
   Nil
 
 lazy val config = {
