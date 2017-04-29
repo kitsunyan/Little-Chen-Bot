@@ -39,7 +39,7 @@ trait RateCommand extends Command with ExtractImage {
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
     def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
-      http("https://services2.microstock.pro/aesthetics/quality")
+      http("https://quality.api.everypixel.com/v1/quality")
         .postMulti(telegramFile.multiPart("data")).runString(HttpFilters.ok) { response =>
         parse(response.body) \ "quality" \ "score" match {
           case JDouble(rating) => rating.toFloat
