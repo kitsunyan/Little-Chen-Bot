@@ -19,7 +19,10 @@ trait IdentityCommand extends Command {
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
     if (arguments.string("h", "help").nonEmpty) {
-      replyMan("Get information about quoted user or yourself.", Nil)
+      replyMan("Get information about quoted user or yourself.",
+        (List("-h", "--help"), None,
+          "Display this help.") ::
+        Nil)
     } else {
       val targetMessage = message.replyToMessage.getOrElse(message)
       val name = targetMessage.from

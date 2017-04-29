@@ -316,7 +316,7 @@ trait IqdbCommand extends Command with ExtractImage {
 
     def printConfiguration(item: IqdbConfigurationData.Item): Future[Message] = {
       val minSimilarity = item.minSimilarity.map(_.toString).getOrElse("_default_")
-      val priority = item.priority.map(_.reduce(_ + ", " + _).replaceAll("[`*_\\[\\]()]", "")).getOrElse("_default_")
+      val priority = item.priority.map(_.reduce(_ + ", " + _)).map(clearMarkup).getOrElse("_default_")
       replyQuote("Current configuration:\n" +
         s"\n`--min-similarity`: $minSimilarity" +
         s"\n`--priority`: $priority", Some(ParseMode.Markdown))

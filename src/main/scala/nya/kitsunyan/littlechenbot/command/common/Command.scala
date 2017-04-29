@@ -122,6 +122,10 @@ trait Command extends BotBase with AkkaDefaults {
     replyQuote(text, Some(ParseMode.Markdown))
   }
 
+  def clearMarkup(text: String): String = {
+    text.replaceAll("[`*_\\[\\]()]", "")
+  }
+
   def trimCaption(caption: String): String = {
     // 200 is maximum caption length for Telegram
     if (caption.length > 200) {

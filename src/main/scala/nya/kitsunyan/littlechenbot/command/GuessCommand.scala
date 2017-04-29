@@ -256,6 +256,8 @@ trait GuessCommand extends Command {
       replyMan("A small game in guessing a character by booru tags.",
         (List("-t", "--tags"), None,
           "A list of tags to puzzle a character.") ::
+        (List("-h", "--help"), None,
+          "Display this help.") ::
         Nil)
     } else {
       val tags = arguments.string("t", "tags")
