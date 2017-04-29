@@ -169,7 +169,7 @@ trait GoogleCommand extends Command with ExtractImage {
 
     if (arguments.string("h", "help").nonEmpty) {
       replyMan("Search image using images.google.com.",
-        (List("-i", "--index"), None,
+        (List("-i", "--index"), Some("integer"),
           "Fetch image by index. Only available when I've already found anything.") ::
         (List("-d", "--as-document"), None,
           "Fetch image as document in original quality.") ::

@@ -254,7 +254,7 @@ trait GuessCommand extends Command {
 
     if (arguments.string("h", "help").nonEmpty) {
       replyMan("A small game in guessing a character by booru tags.",
-        (List("-t", "--tags"), None,
+        (List("-t", "--tags"), Some("string list"),
           "A list of tags to puzzle a character.") ::
         (List("-h", "--help"), None,
           "Display this help.") ::
