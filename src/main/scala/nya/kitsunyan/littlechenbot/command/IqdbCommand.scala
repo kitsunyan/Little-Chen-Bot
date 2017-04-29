@@ -124,14 +124,7 @@ trait IqdbCommand extends Command with ExtractImage {
     def readBooruImage(imageData: ImageData): ReadImageData = {
       http(imageData.url, proxy = true)
         .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
-        val name = {
-          val url = imageData.url
-          val start = url.lastIndexOf('/') + 1
-          val end = url.indexOf('?', start)
-          if (end >= start) url.substring(start, end) else url.substring(start)
-        }
-
-        ReadImageData(name, response.body)(imageData.pageUrlFunction, imageData.tags)
+        ReadImageData(Utils.extractNameFromUrl(imageData.url), response.body)(imageData.pageUrlFunction, imageData.tags)
       }
     }
 

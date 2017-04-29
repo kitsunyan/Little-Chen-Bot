@@ -154,4 +154,22 @@ object Utils {
       }
     }.getOrElse(s)
   }
+
+  def getUrlParameters(url: java.net.URL): Map[String, Option[String]] = {
+    def decode(s: String): String = java.net.URLDecoder.decode(s, "UTF-8")
+
+    val query = Option(url.getQuery).getOrElse("")
+
+    query.split("&").toList.map { part =>
+      val s = part.split("=", 2)
+      decode(s.head) -> s.lift(1).map(decode)
+    }.toMap
+  }
+
+  def extractNameFromUrl(url: String): String = {
+    val start = url.lastIndexOf('/') + 1
+    val end = url.indexOf('?', start)
+    val name = if (end >= start) url.substring(start, end) else url.substring(start)
+    java.net.URLDecoder.decode(name, "UTF-8")
+  }
 }

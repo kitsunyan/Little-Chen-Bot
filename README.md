@@ -1,6 +1,6 @@
 # Little Chen Bot
 
-Telegram bot that allows you to fetch images from iqdb.
+Telegram bot that allows you to fetch images using iqdb and google.
 
 ## Dependencies
 
