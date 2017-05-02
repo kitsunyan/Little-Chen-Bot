@@ -36,11 +36,11 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleErrorCommon(e: Exception, causalMessage: Message, kind: String)(implicit message: Message): Future[Any] = {
     handleException(e, Some(causalMessage))
-    val userMessage = (e match {
-      case e: UserMessageException => e.userMessage
-      case _ => None
-    }).map("\n\n" + _).getOrElse("")
-    replyQuote(s"An exception was thrown during $kind.$userMessage")
+    val userMessage = e match {
+      case e: UserMessageException => e.userMessage.getOrElse(e.getCause.getClass.getName)
+      case e => e.getClass.getName
+    }
+    replyQuote(s"An exception was thrown during $kind.\n\n$userMessage")
   }
 
   private def filterCommands(commands: List[String], botNickname: String)(text: String): Option[Arguments] = {
