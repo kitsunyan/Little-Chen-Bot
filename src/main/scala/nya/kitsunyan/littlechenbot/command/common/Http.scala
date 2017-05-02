@@ -7,7 +7,18 @@ import scalaj.http._
 import scala.language.implicitConversions
 
 trait Http {
-  def http(url: String, proxy: Boolean = false): HttpRequest
+  val proxy: Option[(String, Int, java.net.Proxy.Type)]
+
+  private object BotHttp extends BaseHttp(options = Seq(HttpOptions.followRedirects(true),
+    HttpOptions.connTimeout(15000), HttpOptions.readTimeout(15000)),
+    userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
+
+  def http(url: String, proxy: Boolean = false): HttpRequest = {
+    val baseRequest = BotHttp(url)
+    (if (proxy) this.proxy else None)
+      .map((baseRequest.proxy(_: String, _: Int, _: java.net.Proxy.Type)).tupled)
+      .getOrElse(baseRequest)
+  }
 
   type Headers = Map[String, IndexedSeq[String]]
   type HttpFilter = (String, Boolean, Int, Headers) => Unit

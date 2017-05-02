@@ -8,8 +8,6 @@ import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
-import scalaj.http._
-
 import scala.concurrent.Future
 
 object BotApplication extends App {
@@ -32,7 +30,7 @@ object BotApplication extends App {
     private val chatsAnyGroup = configuration.boolean("bot.chatsAnyGroup").getOrElse(false)
     private val startTime = executionStart / 1000
 
-    private val proxy = {
+    override val proxy: Option[(String, Int, java.net.Proxy.Type)] = {
       for {
         host <- configuration.string("bot.proxy.host")
         port <- configuration.int("bot.proxy.port")
@@ -66,17 +64,6 @@ object BotApplication extends App {
           }
         }
       }
-    }
-
-    private object BotHttp extends BaseHttp(options = Seq(HttpOptions.followRedirects(true),
-      HttpOptions.connTimeout(10000), HttpOptions.readTimeout(10000)),
-      userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
-
-    override def http(url: String, proxy: Boolean): HttpRequest = {
-      val baseRequest = BotHttp(url)
-      (if (proxy) ShikigamiBot.proxy else None)
-        .map((baseRequest.proxy(_: String, _: Int, _: java.net.Proxy.Type)).tupled)
-        .getOrElse(baseRequest)
     }
   }
 
