@@ -167,7 +167,7 @@ trait GoogleCommand extends Command with ExtractImage {
       }
     }
 
-    if (arguments.string("h", "help").nonEmpty) {
+    if (arguments("h", "help").nonEmpty) {
       replyMan("Search image using images.google.com.",
         (List("-i", "--index"), Some("integer"),
           "Fetch image by index. Only available when I've already found anything.") ::
@@ -177,8 +177,8 @@ trait GoogleCommand extends Command with ExtractImage {
           "Display this help.") ::
         Nil)
     } else {
-      val indexOption = arguments.int("i", "index")
-      val asDocument = arguments.string("d", "as-document").nonEmpty
+      val indexOption = arguments("i", "index").asInt
+      val asDocument = arguments("d", "as-document").nonEmpty
 
       indexOption.map { index =>
         extractUrlsListFromWorkspace

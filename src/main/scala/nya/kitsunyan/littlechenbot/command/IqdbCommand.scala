@@ -329,13 +329,13 @@ trait IqdbCommand extends Command with ExtractImage {
       future.map(next).map(_(value))
     }
 
-    val similarityOption = arguments.int("s", "min-similarity")
+    val similarityOption = arguments("s", "min-similarity").asInt
       .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
 
-    val priorityOption = arguments.string("p", "priority")
+    val priorityOption = arguments("p", "priority").asString
       .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
 
-    if (arguments.string("h", "help").nonEmpty) {
+    if (arguments("h", "help").nonEmpty) {
       replyMan("Fetch image from \\*booru using iqdb.org.",
         (List("-i", "--index"), Some("integer"),
           "Fetch image by specified index.") ::
@@ -359,7 +359,7 @@ trait IqdbCommand extends Command with ExtractImage {
         (List("-h", "--help"), None,
           "Display this help.") ::
         Nil)
-    } else if (arguments.string(null, "example").nonEmpty) {
+    } else if (arguments("example").nonEmpty) {
       replyQuote("Examples of usage:" +
         "\n\nFetch image by index:" +
         "\n    `/iqdb --index 2`" +
@@ -391,26 +391,26 @@ trait IqdbCommand extends Command with ExtractImage {
         "\n    `/iqdb -c --reset`" +
         "\n    `/iqdb -c --reset -s 50`",
         Some(ParseMode.Markdown))
-    } else if (arguments.string(null, "list").nonEmpty) {
+    } else if (arguments("list").nonEmpty) {
       replyQuote("Supported \\*booru services:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
         val primaryDomain = v.aliases.find(_.primaryDomain).get.name
         val aliases = v.aliases.filter(!_.primaryDomain).map(_.name).reduce(_ + "_, _" + _)
         val aliasesText = if (aliases.isEmpty) "" else s" (aliases: _${aliases}_)"
         (i + 1, s"$a\n$i: $primaryDomain$aliasesText")
       }._2, Some(ParseMode.Markdown))
-    } else if (arguments.string("c", "configure").nonEmpty) {
-      val reset = arguments.string(null, "reset")
+    } else if (arguments("c", "configure").nonEmpty) {
+      val reset = arguments("reset").nonEmpty
 
       message.from.map(_.id.toLong).map { userId =>
         IqdbConfigurationData.get(userId)
-          .map(configureItem(userId, similarityOption, priorityOption, reset.nonEmpty))
+          .map(configureItem(userId, similarityOption, priorityOption, reset))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
           .recoverWith(handleError("configuration handling")(message))
       }.getOrElse(Future.unit)
     } else {
-      val indexOption = arguments.int("i", "index")
-      val query = arguments.string("q", "query").nonEmpty
-      val tags = arguments.string("t", "tags").nonEmpty
+      val indexOption = arguments("i", "index").asInt
+      val query = arguments("q", "query").nonEmpty
+      val tags = arguments("t", "tags").nonEmpty
       val similarity = getConfiguration(similarityOption, _.minSimilarity, 70)
       val priority = getConfiguration(priorityOption, _.priority, Nil)
 

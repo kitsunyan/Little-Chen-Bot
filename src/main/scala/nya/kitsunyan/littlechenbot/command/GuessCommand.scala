@@ -252,7 +252,7 @@ trait GuessCommand extends Command {
         .flatMap(m => (actor ? CreateGame(m.messageId, game)).map(_ => m))
     }
 
-    if (arguments.string("h", "help").nonEmpty) {
+    if (arguments("h", "help").nonEmpty) {
       replyMan("A small game in guessing a character by booru tags.",
         (List("-t", "--tags"), Some("string list"),
           "A list of tags to puzzle a character.") ::
@@ -260,7 +260,7 @@ trait GuessCommand extends Command {
           "Display this help.") ::
         Nil)
     } else {
-      val tags = arguments.string("t", "tags")
+      val tags = arguments("t", "tags").asString
         .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
         .getOrElse(Nil)
 

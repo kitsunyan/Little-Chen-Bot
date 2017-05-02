@@ -19,7 +19,7 @@ trait HelpCommand extends Command {
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
-    if (arguments.string("h", "help").nonEmpty) {
+    if (arguments("h", "help").nonEmpty) {
       replyMan("Display list of supported commands.",
         (List("-h", "--help"), None,
           "Display this help.") ::

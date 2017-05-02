@@ -45,20 +45,34 @@ class Arguments(data: String) {
   private val arguments = mapArguments(splitSpaces(0, false, false, Nil, Nil), None, Map())
 
   private def option(prefix: String, key: String): Option[String] = {
-    Option(key).map(prefix + _).flatMap(arguments.get)
+    arguments.get(prefix + key)
   }
 
-  def string(shortKey: String, longKey: String): Option[String] = {
-    option("-", shortKey) orElse option("--", longKey) orElse option("—", longKey)
-  }
+  class ArgumentValue(value: Option[String]) {
+    def asString: Option[String] = value
 
-  def int(shortKey: String, longKey: String): Option[Int] = {
-    string(shortKey, longKey).flatMap { v =>
-      try {
-        Some(v.toInt)
-      } catch {
-        case _: NumberFormatException => None
+    def asInt: Option[Int] = {
+      value.flatMap { value =>
+        try {
+          Some(value.toInt)
+        } catch {
+          case _: NumberFormatException => None
+        }
       }
     }
+
+    def nonEmpty: Boolean = value.nonEmpty
+  }
+
+  def apply(shortKey: Option[String], longKey: String): ArgumentValue = {
+    new ArgumentValue(shortKey.flatMap(option("-", _)) orElse option("--", longKey) orElse option("—", longKey))
+  }
+
+  def apply[T](shortKey: String, longKey: String): ArgumentValue = {
+    this(Some(shortKey), longKey)
+  }
+
+  def apply[T](longKey: String): ArgumentValue = {
+    this(None, longKey)
   }
 }

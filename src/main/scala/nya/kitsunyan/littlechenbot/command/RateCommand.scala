@@ -58,7 +58,7 @@ trait RateCommand extends Command with ExtractImage {
         replyToMessageId = Some(message.replyToMessage.getOrElse(message).messageId)))
     }
 
-    if (arguments.string("h", "help").nonEmpty) {
+    if (arguments("h", "help").nonEmpty) {
       replyMan("Rate image using everypixel.com.",
         (List("-h", "--help"), None,
           "Display this help.") ::

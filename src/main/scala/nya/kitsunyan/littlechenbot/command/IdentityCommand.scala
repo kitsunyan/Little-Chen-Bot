@@ -18,7 +18,7 @@ trait IdentityCommand extends Command {
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
-    if (arguments.string("h", "help").nonEmpty) {
+    if (arguments("h", "help").nonEmpty) {
       replyMan("Get information about quoted user or yourself.",
         (List("-h", "--help"), None,
           "Display this help.") ::
