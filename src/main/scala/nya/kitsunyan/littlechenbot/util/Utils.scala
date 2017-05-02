@@ -1,8 +1,8 @@
 package nya.kitsunyan.littlechenbot.util
 
 object Utils {
-  private def exec(data: Option[Array[Byte]], commands: Array[String]): Array[Byte] = {
-    val process = Runtime.getRuntime.exec(commands)
+  def exec(data: Option[Array[Byte]], commands: Seq[String]): Array[Byte] = {
+    val process = Runtime.getRuntime.exec(commands.toArray)
     try {
       val outputStream = process.getOutputStream
       data.foreach(outputStream.write)
@@ -20,7 +20,7 @@ object Utils {
 
   def webpToPng(data: Array[Byte]): Option[Array[Byte]] = {
     try {
-      Some(exec(Some(data), Array("dwebp", "-o", "-", "--", "-")))
+      Some(exec(Some(data), List("dwebp", "-o", "-", "--", "-")))
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -85,12 +85,12 @@ object Utils {
             val c3 = List("-background", imageBackgroundColor, "-gravity", "center",
               "-extent", s"${width}x${height}", "png:-")
 
-            exec(Some(image), (c1 ::: (if (blurRadius >= 2) c2 else Nil) ::: c3).toArray)
+            exec(Some(image), c1 ::: (if (blurRadius >= 2) c2 else Nil) ::: c3)
           }
         }
 
         (preview.index, newImage, preview.blurMode.color)
-      }.foldLeft(exec(None, Array("convert", "-size", s"${totalWidth}x${totalHeight}",
+      }.foldLeft(exec(None, List("convert", "-size", s"${totalWidth}x${totalHeight}",
         s"canvas:$backgroundColor", "png:-")), 0) { case ((result, i), (index, image, indexCircleColor)) =>
         // Draw each image on canvas
         (image.map { image =>
@@ -120,7 +120,7 @@ object Utils {
               if (value > 0) s"+$value" else s"$value"
             }
 
-            exec(Some(result), Array("convert", "png:-",
+            exec(Some(result), List("convert", "png:-",
               file.getPath, "-geometry", s"+$imageX+$imageY", "-composite",
               "-fill", backgroundColor, "-draw", s"rectangle $indexX,$indexY $indexXedge,$indexYedge",
               "-fill", indexCircleColor, "-draw", s"circle $indexX,$indexY ${indexXedge - 1},$indexY",

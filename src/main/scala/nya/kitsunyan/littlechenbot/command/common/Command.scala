@@ -13,6 +13,7 @@ trait Command extends BotBase with AkkaDefaults {
 
   val bot: Future[Bot]
   val workspace: Option[Long]
+  val botOwner: Option[Long]
 
   case class FilterChat(soft: Boolean, hard: Boolean)
 
@@ -36,11 +37,23 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleErrorCommon(e: Exception, causalMessage: Message, kind: String)(implicit message: Message): Future[Any] = {
     handleException(e, Some(causalMessage))
-    val userMessage = e match {
-      case e: UserMessageException => e.userMessage.getOrElse(e.getCause.getClass.getName)
-      case e => e.getClass.getName
+    replyQuote(s"An exception was thrown during $kind.\n${userMessageForException(e)}")
+  }
+
+  def userMessageForException(e: Exception): String = {
+    e match {
+      case e: UserMessageException =>
+        e.userMessage.getOrElse(e.getCause.getClass.getName)
+      case e: java.io.IOException =>
+        val message = Option(e.getMessage)
+          .filter(s => !s.contains("http://") && !s.contains("https://"))
+          .filter("\\d+\\.\\d+\\.\\d+\\.\\d+".r.findFirstIn(_).isEmpty)
+          .map(": " + _)
+          .getOrElse("")
+        s"${e.getClass.getName}$message"
+      case e =>
+        e.getClass.getName
     }
-    replyQuote(s"An exception was thrown during $kind.\n\n$userMessage")
   }
 
   private def filterCommands(commands: List[String], botNickname: String)(text: String): Option[Arguments] = {

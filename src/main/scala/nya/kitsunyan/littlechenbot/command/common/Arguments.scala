@@ -61,6 +61,16 @@ class Arguments(data: String) {
       }
     }
 
+    def asLong: Option[Long] = {
+      value.flatMap { value =>
+        try {
+          Some(value.toLong)
+        } catch {
+          case _: NumberFormatException => None
+        }
+      }
+    }
+
     def nonEmpty: Boolean = value.nonEmpty
   }
 

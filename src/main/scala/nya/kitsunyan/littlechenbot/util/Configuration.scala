@@ -18,6 +18,8 @@ class Configuration private[Configuration] (config: Config) {
   def boolean(key: String): Option[Boolean] = config(_.getBoolean, key)
   def string(key: String): Option[String] = config(_.getString, key)
 
+  def stringList(key: String): Option[List[String]] = config(_.getStringList, key).map(_.asScala.toList)
+
   def configurationList(key: String): List[Configuration] = {
     try {
       config.getObjectList(key).asScala.toList.map(o => new Configuration(o.toConfig))

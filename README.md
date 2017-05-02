@@ -52,6 +52,7 @@ Available properties:
 * `bot.proxy.host` — Proxy host (`String`)
 * `bot.proxy.port` — Proxy port (`Int`)
 * `bot.proxy.type` — Proxy type: http, socks, direct (`String`)
+* `bot.proxy.restart` — Command to restart proxy (list of `String`)
 
 A `bot.workspace` parameter allows to save some data using chat messages. A special chat should be created for a bot where it will send messages and obtain them later. It's possible in Telegtam to create a group and leave it then leaving only a bot in the chat.
 
@@ -75,6 +76,7 @@ bot {
         host = "localhost"
         port = 9050
         type = "socks"
+        restart = [ "/usr/bin/systemctl" "restart" "tor" ]
     }
 }
 ```

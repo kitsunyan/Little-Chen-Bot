@@ -13,13 +13,12 @@ import scala.concurrent.Future
 object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
-  object ShikigamiBot extends TelegramBot with Polling with Http with HelpCommand with IqdbCommand with RateCommand
-    with GoogleCommand with GuessCommand with IdentityCommand {
-    override def token: String = config.getString("bot.token")
-    override val bot: Future[Bot] = request(GetMe).map(m => Bot(m.username.getOrElse(""), m.id))
+  object ShikigamiBot extends TelegramBot with Polling with Http with HelpCommand with ControlCommand with
+    IqdbCommand with RateCommand with GoogleCommand with GuessCommand with IdentityCommand {
+    override def token: String = configuration.string("bot.token").get
     override val workspace: Option[Long] = configuration.long("bot.workspace")
-
-    private val botOwner = configuration.long("bot.owner")
+    override val bot: Future[Bot] = request(GetMe).map(m => Bot(m.username.getOrElse(""), m.id))
+    override val botOwner: Option[Long] = configuration.long("bot.owner")
 
     private case class Chat(id: Long, alias: Option[String])
 
@@ -36,6 +35,12 @@ object BotApplication extends App {
         port <- configuration.int("bot.proxy.port")
         typeString <- configuration.string("bot.proxy.type")
       } yield (host, port, java.net.Proxy.Type.valueOf(typeString.toUpperCase))
+    }
+
+    override val restartProxyCommand: Option[Seq[String]] = configuration.stringList("bot.proxy.restart")
+
+    override def chatForAlias(alias: String): Option[Long] = {
+      chats.find(_.alias.contains(alias)).map(_.id)
     }
 
     override def filterChat(message: Message): FilterChat = {
