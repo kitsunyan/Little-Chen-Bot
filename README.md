@@ -43,15 +43,15 @@ You should create `littlechenbot.conf` in the project directory.
 
 Available properties:
 
-* `bot.token` — Telegram API token (String, required)
-* `bot.owner` — Bot owner ID to log errors (Long)
-* `bot.workspace` — Chat ID for bot's internal storage (Long)
-* `bot.chats` — List of allowed chat IDs (list of Long values)
-* `bot.chatsAnyPrivate` — Allows to reply to all private chats (Boolean)
-* `bot.chatsAnyGroup` — Allows to reply to all group chats (Boolean)
-* `bot.proxy.host` — Proxy host (String)
-* `bot.proxy.port` — Proxy port (Int)
-* `bot.proxy.type` — Proxy type: http, socks, direct (String)
+* `bot.token` — Telegram API token (`String`, required)
+* `bot.owner` — Bot owner ID to log errors (`Long`)
+* `bot.workspace` — Chat ID for bot's internal storage (`Long`)
+* `bot.chats` — List of allowed chats (list of `(id: Long, alias: String)`)
+* `bot.chatsAnyPrivate` — Allows to reply to all private chats (`Boolean`)
+* `bot.chatsAnyGroup` — Allows to reply to all group chats (`Boolean`)
+* `bot.proxy.host` — Proxy host (`String`)
+* `bot.proxy.port` — Proxy port (`Int`)
+* `bot.proxy.type` — Proxy type: http, socks, direct (`String`)
 
 A `bot.workspace` parameter allows to save some data using chat messages. A special chat should be created for a bot where it will send messages and obtain them later. It's possible in Telegtam to create a group and leave it then leaving only a bot in the chat.
 
@@ -62,8 +62,14 @@ bot {
     token = "385946732:Jsi19If0si1_dj8AojOS9N5dhsJc8jJ7S98"
     chatsAnyPrivate = true
     chats = [
-        83420754235, // Chat 1
-        -4759243795 // Chat 2
+        {
+            id = 83420754235,
+            alias = "chat1"
+        },
+        {
+            id = -4759243795,
+            alias = "chat2"
+        }
     ]
     proxy = {
         host = "localhost"

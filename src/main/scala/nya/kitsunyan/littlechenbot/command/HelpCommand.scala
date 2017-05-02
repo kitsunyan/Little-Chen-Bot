@@ -15,7 +15,7 @@ trait HelpCommand extends Command {
   }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.hard)
+    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
