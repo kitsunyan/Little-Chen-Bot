@@ -12,7 +12,11 @@ class Arguments(data: String) {
           if (chars.nonEmpty) chars.reverse.mkString :: arguments else arguments)
       } else {
         if (escape) {
-          splitSpaces(index + 1, quote, false, c :: chars, arguments)
+          if (c == 'n') {
+            splitSpaces(index + 1, quote, false, '\n' :: chars, arguments)
+          } else {
+            splitSpaces(index + 1, quote, false, chars, arguments)
+          }
         } else {
           if (c == '\\') {
             splitSpaces(index + 1, quote, true, chars, arguments)
@@ -28,17 +32,17 @@ class Arguments(data: String) {
     }
   }
 
-  @tailrec private def mapArguments(arguments: List[String], what: Option[String],
+  @tailrec private def mapArguments(arguments: List[String], targetArgument: Option[String],
     result: Map[String, String]): Map[String, String] = {
     if (arguments.nonEmpty) {
       val argument = arguments.head
       if (argument.startsWith("-") || argument.startsWith("—")) {
-        mapArguments(arguments.tail, Some(argument), what.map(w => result + (w -> "")).getOrElse(result))
+        mapArguments(arguments.tail, Some(argument), targetArgument.map(a => result + (a -> "")).getOrElse(result))
       } else {
-        mapArguments(arguments.tail, None, what.map(w => result + (w -> argument)).getOrElse(result))
+        mapArguments(arguments.tail, None, result + (targetArgument.getOrElse("") -> argument))
       }
     } else {
-      what.map(w => result + (w -> "")).getOrElse(result)
+      targetArgument.map(a => result + (a -> "")).getOrElse(result)
     }
   }
 
