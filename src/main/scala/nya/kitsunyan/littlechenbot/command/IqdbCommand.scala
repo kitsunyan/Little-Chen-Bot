@@ -336,76 +336,83 @@ trait IqdbCommand extends Command with ExtractImage {
       .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
 
     if (arguments("h", "help").nonEmpty) {
-      replyMan("Fetch image from \\*booru using iqdb.org.",
-        (List("-i", "--index"), Some("integer"),
-          "Fetch image by specified index.") ::
-        (List("-q", "--query"), None,
-          "Query list of images without result.") ::
-        (List("-t", "--tags"), None,
-          "Attach a complete list of tags to reply.") ::
-        (List("-s", "--min-similarity"), Some("0-100"),
-          "Set minimum allowed similarity for found images.") ::
-        (List("-p", "--priority"), Some("string list"),
-          "Set priority for \\*booru services.") ::
-        (List("-c", "--configure"), None,
-          "Set default arguments for user. Specified `--priority` and `--min-similarity` " +
-          "arguments will be stored as default.") ::
-        (List("--reset"), None,
-          "Reset all default arguments. Can be used with `--configure` argument only.") ::
-        (List("--example"), None,
-          "Print examples of usage.") ::
-        (List("--list"), None,
-          "Print all supported \\*booru services.") ::
-        (List("-h", "--help"), None,
-          "Display this help.") ::
-        Nil)
+      checkArguments(arguments, "h", "help").unitFlatMap {
+        replyMan("Fetch image from \\*booru using iqdb.org.",
+          (List("-i", "--index"), Some("integer"),
+            "Fetch image by specified index.") ::
+          (List("-q", "--query"), None,
+            "Query list of images without result.") ::
+          (List("-t", "--tags"), None,
+            "Attach a complete list of tags to reply.") ::
+          (List("-s", "--min-similarity"), Some("0-100"),
+            "Set minimum allowed similarity for found images.") ::
+          (List("-p", "--priority"), Some("string list"),
+            "Set priority for \\*booru services.") ::
+          (List("-c", "--configure"), None,
+            "Set default arguments for user. Specified `--priority` and `--min-similarity` " +
+            "arguments will be stored as default.") ::
+          (List("--reset"), None,
+            "Reset all default arguments. Can be used with `--configure` argument only.") ::
+          (List("--example"), None,
+            "Print examples of usage.") ::
+          (List("--list"), None,
+            "Print all supported \\*booru services.") ::
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
+      }.recoverWith(handleError(None)(message))
     } else if (arguments("example").nonEmpty) {
-      replyQuote("Examples of usage:" +
-        "\n\nFetch image by index:" +
-        "\n    `/iqdb --index 2`" +
-        "\n    `/iqdb -i 2`" +
-        "\n\nQuery list of images:" +
-        "\n    `/iqdb --query`" +
-        "\n    `/iqdb -q`" +
-        "\n\nQuery image with tags:" +
-        "\n    `/iqdb --tags`" +
-        "\n    `/iqdb -t`" +
-        "\n\nFetch first image with similarity >= 50%:" +
-        "\n    `/iqdb --min-similarity 50`" +
-        "\n    `/iqdb -s 50`" +
-        "\n\nFetch first image from danbooru if possible:" +
-        "\n    `/iqdb --priority danbooru`" +
-        "\n    `/iqdb -p danbooru`" +
-        "\n\nFetch first image from danbooru or gelbooru if possible:" +
-        "\n    `/iqdb -p \"danbooru gelbooru\"`" +
-        "\n\nFetch first image from danbooru with similarity >= 50%:" +
-        "\n    `/iqdb -p danbooru -s 50`" +
-        "\n\nView configuration:" +
-        "\n    `/iqdb --configure`" +
-        "\n    `/iqdb -c`" +
-        "\n\nUpdate configuration:" +
-        "\n    `/iqdb -c -s 50`" +
-        "\n    `/iqdb -c -p \"danbooru gelbooru\"`" +
-        "\n    `/iqdb -c -s 40 -p danbooru`" +
-        "\n\nReset configuration:" +
-        "\n    `/iqdb -c --reset`" +
-        "\n    `/iqdb -c --reset -s 50`",
-        Some(ParseMode.Markdown))
+      checkArguments(arguments, "example").unitFlatMap {
+        replyQuote("Examples of usage:" +
+          "\n\nFetch image by index:" +
+          "\n    `/iqdb --index 2`" +
+          "\n    `/iqdb -i 2`" +
+          "\n\nQuery list of images:" +
+          "\n    `/iqdb --query`" +
+          "\n    `/iqdb -q`" +
+          "\n\nQuery image with tags:" +
+          "\n    `/iqdb --tags`" +
+          "\n    `/iqdb -t`" +
+          "\n\nFetch first image with similarity >= 50%:" +
+          "\n    `/iqdb --min-similarity 50`" +
+          "\n    `/iqdb -s 50`" +
+          "\n\nFetch first image from danbooru if possible:" +
+          "\n    `/iqdb --priority danbooru`" +
+          "\n    `/iqdb -p danbooru`" +
+          "\n\nFetch first image from danbooru or gelbooru if possible:" +
+          "\n    `/iqdb -p \"danbooru gelbooru\"`" +
+          "\n\nFetch first image from danbooru with similarity >= 50%:" +
+          "\n    `/iqdb -p danbooru -s 50`" +
+          "\n\nView configuration:" +
+          "\n    `/iqdb --configure`" +
+          "\n    `/iqdb -c`" +
+          "\n\nUpdate configuration:" +
+          "\n    `/iqdb -c -s 50`" +
+          "\n    `/iqdb -c -p \"danbooru gelbooru\"`" +
+          "\n    `/iqdb -c -s 40 -p danbooru`" +
+          "\n\nReset configuration:" +
+          "\n    `/iqdb -c --reset`" +
+          "\n    `/iqdb -c --reset -s 50`",
+          Some(ParseMode.Markdown))
+      }.recoverWith(handleError(None)(message))
     } else if (arguments("list").nonEmpty) {
-      replyQuote("Supported \\*booru services:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
-        val primaryDomain = v.aliases.find(_.primaryDomain).get.name
-        val aliases = v.aliases.filter(!_.primaryDomain).map(_.name).reduce(_ + "_, _" + _)
-        val aliasesText = if (aliases.isEmpty) "" else s" (aliases: _${aliases}_)"
-        (i + 1, s"$a\n$i: $primaryDomain$aliasesText")
-      }._2, Some(ParseMode.Markdown))
+      checkArguments(arguments, "list").unitFlatMap {
+        replyQuote("Supported \\*booru services:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
+          val primaryDomain = v.aliases.find(_.primaryDomain).get.name
+          val aliases = v.aliases.filter(!_.primaryDomain).map(_.name).reduce(_ + "_, _" + _)
+          val aliasesText = if (aliases.isEmpty) "" else s" (aliases: _${aliases}_)"
+          (i + 1, s"$a\n$i: $primaryDomain$aliasesText")
+        }._2, Some(ParseMode.Markdown))
+      }.recoverWith(handleError(None)(message))
     } else if (arguments("c", "configure").nonEmpty) {
       val reset = arguments("reset").nonEmpty
 
       message.from.map(_.id.toLong).map { userId =>
-        IqdbConfigurationData.get(userId)
+        checkArguments(arguments, "c", "configure", "reset", "s", "min-similarity", "p", "priority")
+          .unitFlatMap(IqdbConfigurationData.get(userId))
           .map(configureItem(userId, similarityOption, priorityOption, reset))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
-          .recoverWith(handleError("configuration handling")(message))
+          .recoverWith(handleError(Some("configuration handling"))(message))
       }.getOrElse(Future.unit)
     } else {
       val indexOption = arguments("i", "index").asInt
@@ -419,7 +426,8 @@ trait IqdbCommand extends Command with ExtractImage {
         .getOrElse(Future.successful(None))
         .map(_ orElse extractMessageWithImage)
 
-      messageWithImageFuture
+      checkArguments(arguments, "i", "index", "q", "query", "t", "tags", "s", "min-similarity", "p", "priority")
+        .unitFlatMap(messageWithImageFuture)
         .map(obtainMessageFile(commands.head))
         .scopeFlatMap((messageWithImage, file) => readTelegramFile(file)
           .flatMap(withConfiguration(sendIqdbRequest, similarity))
@@ -428,7 +436,7 @@ trait IqdbCommand extends Command with ExtractImage {
           .map(readBooruImages(messageWithImage, query))
           .flatMap(replyWithImage(!tags))
           .flatMap((replyWithTags(tags) _).tupled))
-        .recoverWith[Any](message)(handleError("image request"))
+        .recoverWith[Any](message)(handleError(Some("image request")))
     }
   }
 }

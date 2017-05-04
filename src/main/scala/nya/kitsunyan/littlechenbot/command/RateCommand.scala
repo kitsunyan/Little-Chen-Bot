@@ -59,16 +59,19 @@ trait RateCommand extends Command with ExtractImage {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      replyMan("Rate image using everypixel.com.",
-        (List("-h", "--help"), None,
-          "Display this help.") ::
-        Nil)
+      checkArguments(arguments, "h", "help").unitFlatMap {
+        replyMan("Rate image using everypixel.com.",
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
+      }.recoverWith(handleError(None)(message))
     } else {
-      Future(obtainMessageFile(commands.head)(extractMessageWithImage))
+      checkArguments(arguments)
+        .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
           .map(sendEverypixelRequest)
           .flatMap(replyWithRating))
-        .recoverWith[Any](message)(handleError("rating request"))
+        .recoverWith[Any](message)(handleError(Some("rating request")))
     }
   }
 }

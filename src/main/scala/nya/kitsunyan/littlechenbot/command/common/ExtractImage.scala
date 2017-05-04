@@ -8,7 +8,6 @@ import info.mukel.telegrambot4s.models._
 import scalaj.http.MultiPart
 
 import scala.concurrent.Future
-import scala.language.implicitConversions
 
 trait ExtractImage {
   this: Command with Http =>
@@ -98,23 +97,5 @@ trait ExtractImage {
         }
       }
     }
-  }
-
-  class RecoverableFuture[A, B, R](future: Future[(A, B)], callback: (A, B) => Future[R]) {
-    def recoverWith[T >: R](defaultValue: A)(recover: A => PartialFunction[Throwable, Future[T]]): Future[T] = {
-      future.flatMap { case (a, b) =>
-        callback(a, b).recoverWith(recover(a))
-      }.recoverWith(recover(defaultValue))
-    }
-  }
-
-  class ScopeFuture[A, B](future: Future[(A, B)]) {
-    def scopeFlatMap[R](callback: (A, B) => Future[R]): RecoverableFuture[A, B, R] = {
-      new RecoverableFuture(future, callback)
-    }
-  }
-
-  implicit def recoverableScopeFuture[A, B](future: Future[(A, B)]): ScopeFuture[A, B] = {
-    new ScopeFuture(future)
   }
 }

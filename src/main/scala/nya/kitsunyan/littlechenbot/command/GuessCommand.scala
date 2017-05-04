@@ -165,7 +165,7 @@ trait GuessCommand extends Command {
     }
 
     val handleErrorInternal: PartialFunction[Throwable, Future[Option[Game]]] = {
-      case e: Exception => handleErrorCommon(e, message, "handling the session").map(_ => game)
+      case e: Exception => handleErrorCommon(e, message, Some("handling the session")).map(_ => game)
     }
 
     game.map { game =>
@@ -253,19 +253,24 @@ trait GuessCommand extends Command {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      replyMan("A small game in guessing a character by booru tags.",
-        (List("-t", "--tags"), Some("string list"),
-          "A list of tags to puzzle a character.") ::
-        (List("-h", "--help"), None,
-          "Display this help.") ::
-        Nil)
+      checkArguments(arguments, "h", "help").unitFlatMap {
+        replyMan("A small game in guessing a character by booru tags.",
+          (List("-t", "--tags"), Some("string list"),
+            "A list of tags to puzzle a character.") ::
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
+      }.recoverWith(handleError(None)(message))
     } else {
       val tags = arguments("t", "tags").asString
         .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
         .getOrElse(Nil)
 
-      Future(queryImages(tags)).map(readRandomImage(tags)).flatMap((createSession _).tupled)
-        .recoverWith(handleError("creating a session")(message))
+      checkArguments(arguments, "t", "tags")
+        .unitMap(queryImages(tags))
+        .map(readRandomImage(tags))
+        .flatMap((createSession _).tupled)
+        .recoverWith(handleError(Some("creating a session"))(message))
     }
   }
 }

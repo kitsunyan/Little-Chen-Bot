@@ -27,54 +27,64 @@ trait ControlCommand extends Command {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      val commands =
-        (false, List("--check-proxy"), None,
-          "Check proxy available.") ::
-        (true, List("--restart-proxy"), None,
-          "Restart proxy.") ::
-        (true, List("-m", "--send-message"), Some("string"),
-          "Send message from bot.") ::
-        (true, List("-t", "--target-chat"), Some("long or string"),
-          "Target chat ID or alias for `--send-message`.") ::
-        (false, List("-h", "--help"), None,
-          "Display this help.") ::
-        Nil
+      checkArguments(arguments, "h", "help").unitFlatMap {
+        val commands =
+          (false, List("--check-proxy"), None,
+            "Check proxy available.") ::
+          (true, List("--restart-proxy"), None,
+            "Restart proxy.") ::
+          (true, List("-m", "--send-message"), Some("string"),
+            "Send message from bot.") ::
+          (true, List("-t", "--target-chat"), Some("long or string"),
+            "Target chat ID or alias for `--send-message`.") ::
+          (false, List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil
 
-      replyMan("Bot control and administration.", commands.flatMap { case (owner, parameters, values, description) =>
-        if (!owner || isOwnerMessage) {
-          Some(parameters, values, description)
-        } else {
-          None
-        }
-      })
-    } else if (arguments("check-proxy").nonEmpty) {
-      if (proxy.nonEmpty) {
-        Future(http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)(identity))
-          .flatMap(_ => replyQuote("It works!")).recoverWith {
-          case e: Exception => replyQuote(s"Everything is broken!\n${userMessageForException(e)}")
-        }
-      } else {
-        replyQuote("Proxy is not present.")
-      }
-    } else if (arguments("restart-proxy").nonEmpty && isOwnerMessage) {
-      if (proxy.nonEmpty) {
-        restartProxyCommand.map { restartProxyCommand =>
-          Future(Utils.exec(None, restartProxyCommand)).flatMap(_ => replyQuote("Ready!")).recoverWith {
-            case e: Exception => replyQuote(s"Something went wrong!\n${userMessageForException(e)}")
+        replyMan("Bot control and administration.", commands.flatMap { case (owner, parameters, values, description) =>
+          if (!owner || isOwnerMessage) {
+            Some(parameters, values, description)
+          } else {
+            None
           }
-        }.getOrElse(replyQuote("I don't know how!"))
-      } else {
-        replyQuote("Proxy is not present.")
-      }
+        })
+      }.recoverWith(handleError(None)(message))
+    } else if (arguments("check-proxy").nonEmpty) {
+      checkArguments(arguments, "check-proxy").unitFlatMap {
+        if (proxy.nonEmpty) {
+          Future(http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)(identity))
+            .flatMap(_ => replyQuote("It works!")).recoverWith {
+            case e: Exception => replyQuote(s"Everything is broken!\n${userMessageForException(e)}")
+          }
+        } else {
+          replyQuote("Proxy is not present.")
+        }
+      }.recoverWith(handleError(None)(message))
+    } else if (arguments("restart-proxy").nonEmpty && isOwnerMessage) {
+      checkArguments(arguments, "restart-proxy").unitFlatMap {
+        if (proxy.nonEmpty) {
+          restartProxyCommand.map { restartProxyCommand =>
+            Future(Utils.exec(None, restartProxyCommand)).flatMap(_ => replyQuote("Ready!")).recoverWith {
+              case e: Exception => replyQuote(s"Something went wrong!\n${userMessageForException(e)}")
+            }
+          }.getOrElse(replyQuote("I don't know how!"))
+        } else {
+          replyQuote("Proxy is not present.")
+        }
+      }.recoverWith(handleError(None)(message))
     } else if (arguments("m", "send-message").nonEmpty && isOwnerMessage) {
-      val targetChatValue = arguments("t", "target-chat")
-      val targetChat = (targetChatValue.asLong orElse targetChatValue.asString.flatMap(chatForAlias))
-        .getOrElse(message.chat.id)
+      checkArguments(arguments, "m", "send-message", "t", "target-chat").unitFlatMap {
+        val targetChatValue = arguments("t", "target-chat")
+        val targetChat = (targetChatValue.asLong orElse targetChatValue.asString.flatMap(chatForAlias))
+          .getOrElse(message.chat.id)
 
-      request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
-        .recoverWith(handleError("sending a message")(message))
+        request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
+          .recoverWith(handleError(Some("sending the message"))(message))
+      }.recoverWith(handleError(None)(message))
     } else {
-      replyQuote(s"Unknown command.\nType `/${commands.head} --help` to view help.", Some(ParseMode.Markdown))
+      checkArguments(arguments).unitFlatMap {
+        replyQuote(s"Unknown command.\nType `/${commands.head} --help` to view help.", Some(ParseMode.Markdown))
+      }.recoverWith(handleError(None)(message))
     }
   }
 }

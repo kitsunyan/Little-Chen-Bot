@@ -168,31 +168,35 @@ trait GoogleCommand extends Command with ExtractImage {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      replyMan("Search image using images.google.com.",
-        (List("-i", "--index"), Some("integer"),
-          "Fetch image by index. Only available when I've already found anything.") ::
-        (List("-d", "--as-document"), None,
-          "Fetch image as document in original quality.") ::
-        (List("-h", "--help"), None,
-          "Display this help.") ::
-        Nil)
+      checkArguments(arguments, "h", "help").unitFlatMap {
+        replyMan("Search image using images.google.com.",
+          (List("-i", "--index"), Some("integer"),
+            "Fetch image by index. Only available when I've already found anything.") ::
+          (List("-d", "--as-document"), None,
+            "Fetch image as document in original quality.") ::
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
+      }.recoverWith(handleError(None)(message))
     } else {
       val indexOption = arguments("i", "index").asInt
       val asDocument = arguments("d", "as-document").nonEmpty
 
       indexOption.map { index =>
-        extractUrlsListFromWorkspace
+        checkArguments(arguments, "i", "index", "d", "as-document")
+          .unitFlatMap(extractUrlsListFromWorkspace)
           .map(fetchImageByIndex(index))
           .flatMap(replyWithImage(asDocument))
-          .recoverWith(handleError("image request")(message))
+          .recoverWith(handleError(Some("image request"))(message))
       } getOrElse {
-        Future(obtainMessageFile(commands.head)(extractMessageWithImage))
+        checkArguments(arguments)
+          .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)
             .map(sendGoogleRequest)
             .map(parseImages)
             .flatMap(storeResponseToWorkspace)
             .flatMap((replyWithPreview _).tupled))
-          .recoverWith[Any](message)(handleError("image request"))
+          .recoverWith[Any](message)(handleError(Some("image request")))
       }
     }
   }

@@ -48,6 +48,8 @@ class Arguments(data: String) {
 
   private val arguments = mapArguments(splitSpaces(0, false, false, Nil, Nil), None, Map())
 
+  def keySet: Set[String] = arguments.keys.toSet
+
   private def option(prefix: String, key: String): Option[String] = {
     arguments.get(prefix + key)
   }
@@ -88,5 +90,9 @@ class Arguments(data: String) {
 
   def apply[T](longKey: String): ArgumentValue = {
     this(None, longKey)
+  }
+
+  def freeValue: ArgumentValue = {
+    new ArgumentValue(arguments.get(""))
   }
 }

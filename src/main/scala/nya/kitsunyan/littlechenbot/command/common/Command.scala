@@ -7,6 +7,7 @@ import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
+import scala.language.implicitConversions
 
 trait Command extends BotBase with AkkaDefaults {
   case class Bot(nickname: String, id: Long)
@@ -25,19 +26,20 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleException(e: Throwable, causalMessage: Option[Message]): Unit
 
-  def handleError(kind: String)(causalMessage: Message)(implicit message: Message):
+  def handleError(during: Option[String])(causalMessage: Message)(implicit message: Message):
     PartialFunction[Throwable, Future[Any]] = {
     case e: RecoverException =>
       e.future
     case e: CommandException =>
       replyQuote(e.getMessage, e.parseMode)
     case e: Exception =>
-      handleErrorCommon(e, causalMessage, kind)
+      handleErrorCommon(e, causalMessage, during)
   }
 
-  def handleErrorCommon(e: Exception, causalMessage: Message, kind: String)(implicit message: Message): Future[Any] = {
+  def handleErrorCommon(e: Exception, causalMessage: Message, during: Option[String])
+    (implicit message: Message): Future[Any] = {
     handleException(e, Some(causalMessage))
-    replyQuote(s"An exception was thrown during $kind.\n${userMessageForException(e)}")
+    replyQuote(s"An exception was thrown${during.map(" during " + _).getOrElse("")}.\n${userMessageForException(e)}")
   }
 
   def userMessageForException(e: Exception): String = {
@@ -100,6 +102,22 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future.unit
 
+  def checkArguments(arguments: Arguments, possibleArguments: String*): Future[Unit] = {
+    val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String].map {
+      case s if s.length >= 2 => s"--$s"
+      case s => s"-$s"
+    })
+
+    if (invalidArguments.nonEmpty) {
+      val printInvalidArgument = clearMarkup(invalidArguments.find(!_.isEmpty)
+        .getOrElse(arguments.freeValue.asString.flatMap(_.split("\n").headOption).getOrElse("")))
+
+      Future.failed(new CommandException(s"Invalid argument: $printInvalidArgument."))
+    } else {
+      Future.unit
+    }
+  }
+
   def replyQuote(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {
     request(SendMessage(Left(message.sender), text, parseMode, replyToMessageId = Some(message.messageId)))
@@ -151,5 +169,32 @@ trait Command extends BotBase with AkkaDefaults {
     } else {
       caption
     }
+  }
+
+  class RecoverableFuture[A, B, R](future: Future[(A, B)], callback: (A, B) => Future[R]) {
+    def recoverWith[T >: R](defaultValue: A)(recover: A => PartialFunction[Throwable, Future[T]]): Future[T] = {
+      future.flatMap { case (a, b) =>
+        callback(a, b).recoverWith(recover(a))
+      }.recoverWith(recover(defaultValue))
+    }
+  }
+
+  class ScopeFuture[A, B](future: Future[(A, B)]) {
+    def scopeFlatMap[R](callback: (A, B) => Future[R]): RecoverableFuture[A, B, R] = {
+      new RecoverableFuture(future, callback)
+    }
+  }
+
+  implicit def scopeFuture[A, B](future: Future[(A, B)]): ScopeFuture[A, B] = {
+    new ScopeFuture(future)
+  }
+
+  class UnitFuture(future: Future[Unit]) {
+    def unitMap[T](f: => T): Future[T] = future.map(_ => f)
+    def unitFlatMap[T](f: => Future[T]): Future[T] = future.flatMap(_ => f)
+  }
+
+  implicit def unitFuture(future: Future[Unit]): UnitFuture = {
+    new UnitFuture(future)
   }
 }

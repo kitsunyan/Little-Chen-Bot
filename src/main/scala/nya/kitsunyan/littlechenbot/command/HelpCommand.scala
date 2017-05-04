@@ -20,16 +20,21 @@ trait HelpCommand extends Command {
 
   private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
     if (arguments("h", "help").nonEmpty) {
-      replyMan("Display list of supported commands.",
-        (List("-h", "--help"), None,
-          "Display this help.") ::
-        Nil)
+      checkArguments(arguments, "h", "help").unitFlatMap {
+        replyMan("Display list of supported commands.",
+          (List("-h", "--help"), None,
+            "Display this help.") ::
+          Nil)
+      }.recoverWith(handleError(None)(message))
     } else {
-      val listOfCommands = prependDescription(Nil).foldRight("List of supported commands:\n") { (v, a) =>
-        s"$a\n/${v.commands.head} — ${clearMarkup(v.text)}"
-      }
-      replyQuote(s"$listOfCommands\n\nYou can view a help for each command using `/command --help`.",
-        Some(ParseMode.Markdown))
+      checkArguments(arguments).unitFlatMap {
+        val listOfCommands = prependDescription(Nil).foldRight("List of supported commands:\n") { (v, a) =>
+          s"$a\n/${v.commands.head} — ${clearMarkup(v.text)}"
+        }
+
+        replyQuote(s"$listOfCommands\n\nYou can view a help for each command using `/command --help`.",
+          Some(ParseMode.Markdown))
+      }.recoverWith(handleError(None)(message))
     }
   }
 }
