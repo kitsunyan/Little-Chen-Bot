@@ -167,9 +167,9 @@ trait IqdbCommand extends Command with ExtractImage {
           storeMessageToWorkspace(messageWithImage).map { requestIdString =>
             val insert = requestIdString.map(" " + _).getOrElse("")
             if (query) {
-              s"Results $insert:\n$additionalResults"
+              s"Results$insert:\n$additionalResults"
             } else {
-              s"$notFoundMessage${insert}.\n\nAdditional results:\n$additionalResults"
+              s"$notFoundMessage$insert.\n\nAdditional results:\n$additionalResults"
             }
           }
         }
