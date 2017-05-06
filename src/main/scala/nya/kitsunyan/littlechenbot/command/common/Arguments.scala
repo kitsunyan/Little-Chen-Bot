@@ -32,17 +32,28 @@ class Arguments(data: String) {
     }
   }
 
-  @tailrec private def mapArguments(arguments: List[String], targetArgument: Option[String],
+  @tailrec private def mapArguments(arguments: List[String], targetParameter: Option[String],
     result: Map[String, String]): Map[String, String] = {
     if (arguments.nonEmpty) {
       val argument = arguments.head
-      if (argument.startsWith("-") || argument.startsWith("—")) {
-        mapArguments(arguments.tail, Some(argument), targetArgument.map(a => result + (a -> "")).getOrElse(result))
+
+      val parameter = if (argument.startsWith("--") && argument.length > 3) {
+        Some(argument.substring(2))
+      } else if (argument.startsWith("—") && argument.length > 2) {
+        Some(argument.substring(1))
+      } else if (argument.startsWith("-") && argument.length == 2) {
+        Some(argument.substring(1))
       } else {
-        mapArguments(arguments.tail, None, result + (targetArgument.getOrElse("") -> argument))
+        None
+      }
+
+      if (parameter.nonEmpty) {
+        mapArguments(arguments.tail, parameter, targetParameter.map(p => result + (p -> "")).getOrElse(result))
+      } else {
+        mapArguments(arguments.tail, None, result + (targetParameter.getOrElse("") -> argument))
       }
     } else {
-      targetArgument.map(a => result + (a -> "")).getOrElse(result)
+      targetParameter.map(p => result + (p -> "")).getOrElse(result)
     }
   }
 
@@ -50,11 +61,7 @@ class Arguments(data: String) {
 
   def keySet: Set[String] = arguments.keys.toSet
 
-  private def option(prefix: String, key: String): Option[String] = {
-    arguments.get(prefix + key)
-  }
-
-  class ArgumentValue(value: Option[String]) {
+  class ArgumentValue private[Arguments] (value: Option[String]) {
     def asString: Option[String] = value
 
     def asInt: Option[Int] = {
@@ -80,16 +87,8 @@ class Arguments(data: String) {
     def nonEmpty: Boolean = value.nonEmpty
   }
 
-  def apply(shortKey: Option[String], longKey: String): ArgumentValue = {
-    new ArgumentValue(shortKey.flatMap(option("-", _)) orElse option("--", longKey) orElse option("—", longKey))
-  }
-
-  def apply[T](shortKey: String, longKey: String): ArgumentValue = {
-    this(Some(shortKey), longKey)
-  }
-
-  def apply[T](longKey: String): ArgumentValue = {
-    this(None, longKey)
+  def apply[T](keys: String*): ArgumentValue = {
+    new ArgumentValue(arguments.filterKeys(keys.contains).values.headOption)
   }
 
   def freeValue: ArgumentValue = {

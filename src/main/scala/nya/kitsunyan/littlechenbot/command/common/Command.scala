@@ -103,10 +103,7 @@ trait Command extends BotBase with AkkaDefaults {
   def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future.unit
 
   def checkArguments(arguments: Arguments, possibleArguments: String*): Future[Unit] = {
-    val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String].map {
-      case s if s.length >= 2 => s"--$s"
-      case s => s"-$s"
-    })
+    val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String])
 
     if (invalidArguments.nonEmpty) {
       val printInvalidArgument = clearMarkup(invalidArguments.find(!_.isEmpty)
