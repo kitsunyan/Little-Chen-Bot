@@ -38,9 +38,9 @@ trait RateCommand extends Command with ExtractImage {
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
+    def sendEverypixelRequest(typedFile: TypedFile): Float = {
       http("https://quality.api.everypixel.com/v1/quality")
-        .postMulti(telegramFile.multiPart("data")).runString(HttpFilters.ok) { response =>
+        .file(typedFile.multipart("data")).runString(HttpFilters.ok) { response =>
         import org.json4s._
         import org.json4s.jackson.JsonMethods._
 

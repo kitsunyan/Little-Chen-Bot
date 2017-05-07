@@ -2,46 +2,43 @@ package nya.kitsunyan.littlechenbot.command.common
 
 import nya.kitsunyan.littlechenbot.util.UserMessageException
 
-import scalaj.http._
+import okhttp3._
+
+import java.util.concurrent.TimeUnit
 
 import scala.language.implicitConversions
 
 trait Http {
-  val proxy: Option[(String, Int, java.net.Proxy.Type)]
+  val proxy: Option[java.net.Proxy]
 
-  private object BotHttp extends BaseHttp(options = Seq(HttpOptions.followRedirects(true),
-    HttpOptions.connTimeout(15000), HttpOptions.readTimeout(15000)),
-    userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
+  private lazy val client = new OkHttpClient.Builder()
+    .connectTimeout(10000, TimeUnit.MILLISECONDS)
+    .readTimeout(10000, TimeUnit.MILLISECONDS)
+    .build
 
-  def http(url: String, proxy: Boolean = false): HttpRequest = {
-    val baseRequest = BotHttp(url)
-    (if (proxy) this.proxy else None)
-      .map((baseRequest.proxy(_: String, _: Int, _: java.net.Proxy.Type)).tupled)
-      .getOrElse(baseRequest)
-  }
+  private lazy val proxyClient = proxy.map(client.newBuilder().proxy(_).build).getOrElse(client)
 
-  type Headers = Map[String, IndexedSeq[String]]
-  type HttpFilter = (String, Boolean, Int, Headers) => Unit
+  type HttpFilter = (String, Boolean, HttpExecution) => Unit
 
   class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
     with UserMessageException
 
   object HttpFilters {
-    def any: HttpFilter = (_, _, _, _) => ()
+    def any: HttpFilter = (_, _, _) => ()
 
     def ok: HttpFilter = code(200)
 
     def code(validCodes: Int*): HttpFilter = {
-      (url, privateUrl, code, _) => {
-        if (!validCodes.contains(code)) {
-          throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$code]")
+      (url, privateUrl, execution) => {
+        if (!validCodes.contains(execution.code)) {
+          throwWithPrivateUrl(url, privateUrl, s"Invalid response: [${execution.code}]")
         }
       }
     }
 
     def contentLength(maxContentLength: Long): HttpFilter = {
-      (url, privateUrl, _, headers) => {
-        headers.get("Content-Length")
+      (url, privateUrl, execution) => {
+        execution.headers("Content-Length")
           .flatMap(_.headOption)
           .map(_.toLong)
           .find(_ > maxContentLength)
@@ -58,9 +55,9 @@ trait Http {
 
   class ExtendedHttpFilter(filter: HttpFilter) {
     def &&(anotherFilter: HttpFilter): HttpFilter = {
-      (url, privateUrl, code, header) => {
-        filter(url, privateUrl, code, header)
-        anotherFilter(url, privateUrl, code, header)
+      (url, privateUrl, execution) => {
+        filter(url, privateUrl, execution)
+        anotherFilter(url, privateUrl, execution)
       }
     }
   }
@@ -69,35 +66,115 @@ trait Http {
     new ExtendedHttpFilter(filter)
   }
 
-  class ExtendedHttpRequest(request: HttpRequest, privateUrl: Boolean) {
-    private def run[T, R](filter: HttpFilter)(callback: HttpResponse[T] => R)
-      (parser: (Headers, java.io.InputStream) => T): R = {
-      callback(request.exec { (code, headers, stream) =>
-        filter(request.url, privateUrl, code, headers)
-        parser(headers, stream)
-      })
+  def http(url: String, proxy: Boolean = false): HttpRequest = {
+    new HttpRequest(new Request.Builder().url(url), proxy = proxy)
+      .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
+  }
+
+  private[Http] trait BodyAppend {
+    def form(body: FormBody.Builder): FormBody.Builder
+    def multipart(body: MultipartBody.Builder): MultipartBody.Builder
+  }
+
+  private[Http] class StringBodyAppend(name: String, value: String) extends BodyAppend {
+    override def form(body: FormBody.Builder): FormBody.Builder = {
+      body.add(name, value)
     }
 
-    def runString[R](filter: HttpFilter)(callback: HttpResponse[String] => R): R = {
-      run(filter)(callback) { (headers, stream) =>
-        val charset = headers.get("Content-Type")
-          .flatMap(_.headOption)
-          .flatMap(c => HttpConstants.CharsetRegex.findFirstMatchIn(c).map(_.group(1)))
-          .getOrElse(request.charset)
-        HttpConstants.readString(stream, charset)
-      }
-    }
-
-    def runBytes[R](filter: HttpFilter)(callback: HttpResponse[Array[Byte]] => R): R = {
-      run(filter)(callback)((_, stream) => HttpConstants.readBytes(stream))
-    }
-
-    def withPrivateUrl(privateUrl: Boolean): ExtendedHttpRequest = {
-      new ExtendedHttpRequest(request, privateUrl)
+    override def multipart(body: MultipartBody.Builder): MultipartBody.Builder = {
+      body.addFormDataPart(name, value)
     }
   }
 
-  implicit def extendHttpRequest(request: HttpRequest): ExtendedHttpRequest = {
-    new ExtendedHttpRequest(request, false)
+  private[Http] class FileBodyAppend(multipartFile: MultipartFile) extends BodyAppend {
+    override def form(body: FormBody.Builder): FormBody.Builder = {
+      throw new UnsupportedOperationException
+    }
+
+    override def multipart(body: MultipartBody.Builder): MultipartBody.Builder = {
+      body.addFormDataPart(multipartFile.name, multipartFile.filename,
+        RequestBody.create(MediaType.parse(multipartFile.mimeType), multipartFile.data))
+    }
+  }
+
+  case class MultipartFile(name: String, filename: String, mimeType: String, data: Array[Byte])
+
+  class HttpRequest(builder: Request.Builder, proxy: Boolean = false, privateUrl: Boolean = false,
+    multipart: Boolean = false, fields: List[BodyAppend] = Nil) {
+    private def copy(builder: Request.Builder = builder, proxy: Boolean = proxy, privateUrl: Boolean = privateUrl,
+      multipart: Boolean = multipart, fields: List[BodyAppend] = fields): HttpRequest = {
+      new HttpRequest(builder, proxy, privateUrl, multipart, fields)
+    }
+
+    def header(name: String, value: String): HttpRequest = {
+      copy(builder = builder.header(name, value))
+    }
+
+    def withPrivateUrl(privateUrl: Boolean): HttpRequest = {
+      copy(privateUrl = privateUrl)
+    }
+
+    def file(multipartFile: MultipartFile): HttpRequest = {
+      copy(multipart = true, fields = new FileBodyAppend(multipartFile) :: fields)
+    }
+
+    def field(field: (String, String)): HttpRequest = {
+      fields(List(field))
+    }
+
+    def fields(fields: Iterable[(String, String)]): HttpRequest = {
+      copy(fields = fields.foldLeft(this.fields) { case (fields, (name, value)) =>
+        new StringBodyAppend(name, value) :: fields
+      })
+    }
+
+    private def run[T, R](filter: HttpFilter, convert: ResponseBody => T, callback: HttpResponse[T] => R): R = {
+      val request = {
+        if (fields.nonEmpty) {
+          val body = if (multipart) {
+            fields.foldRight(new MultipartBody.Builder().setType(MultipartBody.FORM))(_.multipart(_)).build
+          } else {
+            fields.foldRight(new FormBody.Builder)(_.form(_)).build
+          }
+          builder.post(body).build
+        } else {
+          builder.build
+        }
+      }
+
+      val response = (if (proxy) proxyClient else client).newCall(request).execute()
+      val execution = new HttpExecution(response)
+      try {
+        filter(request.url().toString, privateUrl, execution)
+        callback(new HttpResponse(convert(response.body), execution))
+      } catch {
+        case e: Exception =>
+          response.close()
+          throw e
+      }
+    }
+
+    def runString[R](filter: HttpFilter)(callback: HttpResponse[String] => R): R = {
+      run(filter, _.string, callback)
+    }
+
+    def runBytes[R](filter: HttpFilter)(callback: HttpResponse[Array[Byte]] => R): R = {
+      run(filter, _.bytes, callback)
+    }
+  }
+
+  class HttpExecution(response: Response) {
+    def headers(name: String): List[String] = {
+      import scala.collection.JavaConverters._
+      response.headers(name).asScala.toList
+    }
+
+    def code: Int = response.code
+  }
+
+  class HttpResponse[T](val body: T, execution: HttpExecution) {
+    def headers(name: String): List[String] = execution.headers(name)
+
+    def code: Int = execution.code
   }
 }

@@ -29,10 +29,10 @@ trait IqdbCommand extends Command with ExtractImage {
     case class IqdbResult(index: Int, url: String, previewUrl: Option[String], blurMode: Utils.BlurMode,
       booruService: BooruService, alias: Option[String], similarity: Int, matches: Boolean)
 
-    def sendIqdbRequest(minSimilarity: Int)(telegramFile: TelegramFile): List[IqdbResult] = {
+    def sendIqdbRequest(minSimilarity: Int)(typedFile: TypedFile): List[IqdbResult] = {
       http("https://iqdb.org/")
-        .postMulti(telegramFile.multiPart("file"))
-        .params(BooruService.list.map("service[]" -> _.iqdbId)).runString(HttpFilters.ok) { response =>
+        .file(typedFile.multipart("file"))
+        .fields(BooruService.list.map("service[]" -> _.iqdbId)).runString(HttpFilters.ok) { response =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
           "(?:<img src='(.*?)'.*?)?(?:<td>\\d+×\\d+ \\[(\\w+)\\]</td>.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r

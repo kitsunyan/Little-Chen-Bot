@@ -24,10 +24,10 @@ trait GoogleCommand extends Command with ExtractImage {
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def sendGoogleRequest(telegramFile: TelegramFile): String = {
+    def sendGoogleRequest(typedFile: TypedFile): String = {
       http("https://images.google.com/searchbyimage/upload")
-        .postMulti(telegramFile.multiPart("encoded_image"))
-        .params("hl" -> "en").runString(HttpFilters.ok)(_.body)
+        .file(typedFile.multipart("encoded_image"))
+        .field("hl" -> "en").runString(HttpFilters.ok)(_.body)
     }
 
     case class Image(url: String, previewUrl: String, width: Option[Int], height: Option[Int])
@@ -94,7 +94,7 @@ trait GoogleCommand extends Command with ExtractImage {
       indexedImages.map { indexedImage =>
         Future {
           http(indexedImage.image.previewUrl).runBytes(HttpFilters.ok) { response =>
-            val mimeType = response.headers.get("Content-Type").flatMap(_.headOption).getOrElse("image/jpeg")
+            val mimeType = response.headers("Content-Type").headOption.getOrElse("image/jpeg")
             Utils.Preview(indexedImage.index, Some(response.body), mimeType, Utils.BlurMode.No)
           }
         }.recover { case e =>

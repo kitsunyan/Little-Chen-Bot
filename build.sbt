@@ -8,7 +8,7 @@ scalaVersion := "2.12.1"
 
 scalacOptions :=
   "-unchecked" ::
-  "-deprecation:false" ::
+  "-deprecation" ::
   "-feature" ::
   Nil
 
@@ -17,7 +17,6 @@ resolvers += Resolver.sonatypeRepo("snapshots")
 libraryDependencies ++=
   "info.mukel" %% "telegrambot4s" % "2.1.0-SNAPSHOT" ::
   "org.slf4j" % "slf4j-simple" % "1.7.25" ::
-  "org.scalaj" %% "scalaj-http" % "2.3.0" ::
   "org.json4s" %% "json4s-jackson" % "3.5.0" ::
   "org.xerial" % "sqlite-jdbc" % "3.16.1" ::
   "com.typesafe.slick" %% "slick" % "3.2.0" ::

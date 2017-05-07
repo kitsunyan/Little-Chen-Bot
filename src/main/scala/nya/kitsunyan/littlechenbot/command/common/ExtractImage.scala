@@ -5,7 +5,6 @@ import nya.kitsunyan.littlechenbot.util._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
-import scalaj.http.MultiPart
 import scala.concurrent.Future
 
 trait ExtractImage {
@@ -45,15 +44,15 @@ trait ExtractImage {
     }
   }
 
-  case class TelegramFile(data: Array[Byte], mimeType: String) {
-    def multiPart(name: String): MultiPart = MultiPart(name, "filename", mimeType, data)
+  case class TypedFile(data: Array[Byte], mimeType: String) {
+    def multipart(name: String): MultipartFile = MultipartFile(name, "filename", mimeType, data)
   }
 
   private def readExternalFile(file: String, readMeta: Boolean)
-    (implicit locale: Locale): Either[TelegramFile, String] = {
+    (implicit locale: Locale): Either[TypedFile, String] = {
     http(file, proxy = true)
       .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
-      val contentType = response.headers.get("Content-Type").flatMap(_.headOption).map { contentType =>
+      val contentType = response.headers("Content-Type").headOption.map { contentType =>
         val index = contentType.indexOf(';')
         if (index >= 0) contentType.substring(0, index) else contentType
       }
@@ -61,7 +60,7 @@ trait ExtractImage {
       def unable: Nothing = throw new CommandException(locale.UNABLE_TO_FETCH_THE_FILE_BY_URL)
 
       contentType match {
-        case Some(mimeType) if mimeType.startsWith("image/") => Left(TelegramFile(response.body, mimeType))
+        case Some(mimeType) if mimeType.startsWith("image/") => Left(TypedFile(response.body, mimeType))
         case Some("text/html") if readMeta =>
           val responseString = new String(response.body, "ISO-8859-1")
           "<meta property=\"og:image\" content=\"(.*?)\".*?>".r
@@ -75,10 +74,10 @@ trait ExtractImage {
     }
   }
 
-  def readTelegramFile(file: String)(implicit locale: Locale): Future[TelegramFile] = {
+  def readTelegramFile(file: String)(implicit locale: Locale): Future[TypedFile] = {
     if (file.startsWith("http://") || file.startsWith("https://")) {
       Future(readExternalFile(file, true)).map {
-        case Left(telegramFile) => telegramFile
+        case Left(typedFile) => typedFile
         case Right(url) => readExternalFile(url, false).left.getOrElse(throw new Exception("Impossible value."))
       }
     } else {
@@ -92,7 +91,7 @@ trait ExtractImage {
               (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
             }
             val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
-            TelegramFile(data, mimeType)
+            TypedFile(data, mimeType)
           case None => throw new CommandException(locale.UNABLE_TO_FETCH_TELEGRAM_FILE)
         }
       }

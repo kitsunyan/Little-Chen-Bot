@@ -29,12 +29,17 @@ object BotApplication extends App {
     private val chatsAnyGroup = configuration.boolean("bot.chatsAnyGroup").getOrElse(false)
     private val startTime = executionStart / 1000
 
-    override val proxy: Option[(String, Int, java.net.Proxy.Type)] = {
+    override val proxy: Option[java.net.Proxy] = {
       for {
         host <- configuration.string("bot.proxy.host")
         port <- configuration.int("bot.proxy.port")
         typeString <- configuration.string("bot.proxy.type")
-      } yield (host, port, java.net.Proxy.Type.valueOf(typeString.toUpperCase))
+        proxyType <- try {
+          Some(java.net.Proxy.Type.valueOf(typeString.toUpperCase))
+        } catch {
+          case _: Exception => None
+        }
+      } yield new java.net.Proxy(proxyType, java.net.InetSocketAddress.createUnresolved(host, port))
     }
 
     override val restartProxyCommand: Option[Seq[String]] = configuration.stringList("bot.proxy.restart")
@@ -71,9 +76,6 @@ object BotApplication extends App {
       }
     }
   }
-
-  // noinspection ScalaDeprecation
-  java.net.URL.setURLStreamHandlerFactory(new okhttp3.OkUrlFactory(new okhttp3.OkHttpClient))
 
   ShikigamiBot.run()
 }
