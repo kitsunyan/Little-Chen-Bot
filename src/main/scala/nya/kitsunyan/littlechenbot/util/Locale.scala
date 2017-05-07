@@ -254,4 +254,173 @@ object Locale {
     override val YOU_CAN_VIEW_A_HELP_FORMAT: String =
       "You can view a help for each command using %s."
   }
+
+  object Russian extends Locale {
+    override val A_LIST_OF_TAGS_TO_PUZZLE_A_CHARACTER: String =
+      "Список тегов чтобы загадать персонажа."
+    override val ADDITIONAL_RESULTS_FS: String =
+      "Дополнительные результаты"
+    override val AN_EXCEPTION_WAS_THROWN_FORMAT: String =
+      "При %s произошла ошибка."
+    override val AN_EXCEPTION_WAS_THROWN: String =
+      "Произошла ошибка."
+    override val ARE_YOU_KIDDING_ME: String =
+      "Ты шутишь что ли?"
+    override val ARTISTS_FS: String =
+      "Художники"
+    override val A_SMALL_GAME_IN_GUESSING_A_CHARACTER_FD: String =
+      "небольшая игра в угадывание персонажа"
+    override val A_SMALL_GAME_IN_GUESSING_A_CHARACTER: String =
+      "Небольшая игра в угадывание персонажа по \\*booru тегам."
+    override val A_WINNER_IS_YOU: String =
+      "A winner is you!"
+    override val ATTACH_A_COMPLETE_LIST_OF_TAGS_TO_REPLY: String =
+      "Приложить полный список тегов к ответу."
+    override val BOT_CONTROL_AND_ADMINISTRATION: String =
+      "Управление и администрирование бота."
+    override val BOT_CONTROL_FD: String =
+      "управление ботом"
+    override val CHARACTERS_FS: String =
+      "Персонажи"
+    override val CHECK_PROXY_AVAILABLE: String =
+      "Проверить работу прокси."
+    override val CONFIGURATION_HANDLING_FV_FS: String =
+      "обработке конфигурации"
+    override val COPYRIGTHS_FS: String =
+      "Произведения"
+    override val CREATING_A_SESSION_FV_FS: String =
+      "создании сессии"
+    override val CURRENT_CONFIGURATION_FS: String =
+      "Текущая конфигурация"
+    override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
+      "Отображение списка поддерживаемых команд."
+    override val DISPLAY_THIS_HELP_FD: String =
+      "показать эту справку"
+    override val DISPLAY_THIS_HELP: String =
+      "Показать эту справку."
+    override val EVERYTHING_IS_BROKEN: String =
+      "Всё сломано!"
+    override val EXAMPLES_OF_USAGE_FS: String =
+      "Примеры использования"
+    override val FETCH_FROM_DANBOORU_IF_POSSIBLE_FS: String =
+      "Получить первую картинку с danbooru если возможно"
+    override val FETCH_FROM_DANBOORU_OR_GELBOORU_IF_POSSIBLE_FS: String =
+      "Получить первую картинку с danbooru или gelbooru если возможно"
+    override val FETCH_FROM_DANBOORU_WITH_SIMILARITY_50_FS: String =
+      "Получить первую картинку с danbooru со сходством >= 50%"
+    override val FETCH_IMAGE_AS_DOCUMENT: String =
+      "Получить картинку в виде документа в исходном качестве."
+    override val FETCH_IMAGE_BY_INDEX_FS: String =
+      "Получить картинку по номеру"
+    override val FETCH_IMAGE_BY_INDEX: String =
+      "Получить картинку по номеру. Доступно только когда я уже что-то нашла."
+    override val FETCH_IMAGE_BY_SPECIFIED_INDEX: String =
+      "Получить картинку по указанному номеру."
+    override val FETCH_IMAGE_FROM_BOORU_USING_IQDB_ORG: String =
+      "Получуние картинки с \\*booru используя iqdb.org"
+    override val FETCH_WITH_SIMILARITY_50_FS: String =
+      "Получить картинку со сходством >= 50%"
+    override val FIND_IMAGE_WITH_GOOGLE_FD: String =
+      "найти картинку через google"
+    override val FIND_IMAGE_WITH_IQDB_FD: String =
+      "найти картинку через iqdb"
+    override val GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF: String =
+      "Получение информации о цитируемом пользователе или о себе."
+    override val HANDLING_THE_SESSION_FV_FS: String =
+      "обработке сессии"
+    override val HERE_ARE_THE_IMAGES_I_FOUND_FS: String =
+      "Вот картинки, которые я нашла"
+    override val I_DONT_KNOW_HOW: String =
+      "Я не знаю как!"
+    override val IMAGE_REQUEST_FV_FS: String =
+      "запросе картинки"
+    override val INVALID_ARGUMENT_FS: String =
+      "Аргумент инвалид"
+    override val INVALID_SERVER_RESPONSE: String =
+      "Некорректный ответ сервера."
+    override val IT_WORKS: String =
+      "Оно работает!"
+    override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
+      "Список поддерживаемых команд"
+    override val NEXT_TAG_FS: String =
+      "Следующий тег"
+    override val NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS: String =
+      "Картинки не найдены (потому что произошла ошибка)"
+    override val NO_IMAGES_FOUND_FS: String =
+      "Картинки не найдены"
+    override val NOT_PARSED_FS: String =
+      "Не распарсила"
+    override val NOW_REPLY_ME_WITH_FORMAT: String =
+      "Теперь ответь мне, написав %s!"
+    override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
+      "Пожалуйста, ответь на сообщение с картинкой или отправь сообщение с командой в подписи.\n\n" +
+      "Помни, я не могу видеть сообщения других ботов даже когда ты им отвечаешь!\n\n" +
+      "Напиши %s для получения дополнительной информации."
+    override val PRINT_ALL_SUPPORTED_BOORU_SERVICES: String =
+      "Вывести поддерживаемые \\*booru сервисы."
+    override val PRINT_EXAMPLES_OF_USAGE: String =
+      "Вывести примеры использования."
+    override val PROXY_IS_NOT_PRESENT: String =
+      "Прокси не используется."
+    override val QUERY_IMAGE_WITH_TAGS_FS: String =
+      "Запросить картинку с тегами"
+    override val QUERY_LIST_OF_IMAGES_FS: String =
+      "Запросить список картинок"
+    override val QUERY_LIST_OF_IMAGES_WITHOUT_RESULT: String =
+      "Запросить список картинок без результата."
+    override val RATE_IMAGE_FD: String =
+      "оценить картинку"
+    override val RATE_IMAGE_USING_EVERYPIXEL_COM: String =
+      "Оценка картинки через everypixel.com."
+    override val RATING_REQUEST_FV_FS: String =
+      "запросе оценки"
+    override val READY: String =
+      "Готово!"
+    override val RESET_ALL_DEFAULT_ARGUMENTS_FORMAT: String =
+      "Сбросить аргументы по умолчанию. Может быть использовано только с %s."
+    override val RESET_CONFIGURATION_FS: String =
+      "Сбросить конфигурацию"
+    override val RESTART_PROXY: String =
+      "Перезапустить прокси."
+    override val RESULTS_FS: String =
+      "Результаты"
+    override val SEARCH_IMAGES_USING_IMAGES_GOOGLE_COM: String =
+      "Поиск картинки через images.google.com."
+    override val SENDING_THE_MESSAGE_FL_FS: String =
+      "отправке сообщения"
+    override val SEND_MESSAGE_FROM_BOT: String =
+      "Отправить сообщение от бота."
+    override val SET_DEFAULT_ARGUMENTS_FOR_USER_FORMAT: String =
+      "Установить аргументы по умолчанию для пользователя. Указанные аргументы %s и %s будут сохранены."
+    override val SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES: String =
+      "Установить минимальное сходство для найденых картинок."
+    override val SET_PRIORITY_FOR_BOORU_SERVICES: String =
+      "Установить приоритет для \\*booru сервисов."
+    override val SOMETHING_WENT_WRONG: String =
+      "Что-то пошло не так!"
+    override val SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT: String =
+      "Прости, мои настройки не позволят мне это сделать!"
+    override val SUPPORTED_BOORU_SERVICES_FS: String =
+      "Поддерживаемые \\*booru сервисы"
+    override val TAGS_FS: String =
+      "Теги"
+    override val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String =
+      "ID или псевдоним целевого чата для %s."
+    override val UNABLE_TO_FETCH_TELEGRAM_FILE: String =
+      "Не удалось получить файл Telegram."
+    override val UNABLE_TO_FETCH_THE_FILE_BY_URL: String =
+      "Не удалось получить файл по URL."
+    override val UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT: String =
+      "Неизвестная команда.\nВведи %s чтобы посмотреть справку."
+    override val UPDATE_CONFIGURATION_FS: String =
+      "Обновить конфигурацию"
+    override val VIEW_CONFIGURATION_FS: String =
+      "Посмотреть конфигурацию"
+    override val WHO_ARE_YOU_FD: String =
+      "кто ты?"
+    override val YOU_ARE_WRONG: String =
+      "Не угадал!"
+    override val YOU_CAN_VIEW_A_HELP_FORMAT: String =
+      "Ты можешь посмотреть справку для каждой команды используя %s."
+  }
 }
