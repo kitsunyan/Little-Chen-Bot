@@ -100,10 +100,10 @@ trait IqdbCommand extends Command with ExtractImage {
         .getOrElse(iqdbResults)
     }
 
-    case class ImageData(url: String)(val pageUrlFunction: () => String, val tags: List[BooruService#Tag])
+    case class ImageData(url: String)(val pageUrlFunction: () => String, val tags: List[BooruService.Tag])
 
     case class ReadImageData(name: String, image: Array[Byte])(pageUrlFunction: () => String,
-      val tags: List[BooruService#Tag]) {
+      val tags: List[BooruService.Tag]) {
       def pageUrl: String = pageUrlFunction()
     }
 
@@ -182,9 +182,9 @@ trait IqdbCommand extends Command with ExtractImage {
       }
     }
 
-    def collectTags(short: Boolean, tags: List[BooruService#Tag]): Option[String] = {
-      def appendIterable(title: String, skip: Boolean, list: Iterable[BooruService#Tag],
-        filter: BooruService#Tag => Boolean)(s: String): String = {
+    def collectTags(short: Boolean, tags: List[BooruService.Tag]): Option[String] = {
+      def appendIterable(title: String, skip: Boolean, list: Iterable[BooruService.Tag],
+        filter: BooruService.Tag => Boolean)(s: String): String = {
         val filteredList = list.filter(filter)
         if (!skip && filteredList.nonEmpty) {
           val tags = (if (short) filteredList.take(3) else filteredList)

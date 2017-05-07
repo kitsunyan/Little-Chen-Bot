@@ -1,7 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
-import nya.kitsunyan.littlechenbot.service.GelbooruService
+import nya.kitsunyan.littlechenbot.service.BooruService
 import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
@@ -204,12 +204,12 @@ trait GuessCommand extends Command {
 
         val pageUrls = if (page > 0) {
           val newBody = http(s"$url&pid=$page", proxy = true).runString(HttpFilters.ok)(_.body)
-          GelbooruService.parseListHtml(newBody)
+          BooruService.Gelbooru.parseListHtml(newBody)
         } else {
           Nil
         }
 
-        val urls = if (pageUrls.nonEmpty) pageUrls else GelbooruService.parseListHtml(response.body)
+        val urls = if (pageUrls.nonEmpty) pageUrls else BooruService.Gelbooru.parseListHtml(response.body)
         if (urls.nonEmpty) {
           urls
         } else {
@@ -218,8 +218,8 @@ trait GuessCommand extends Command {
       }
     }
 
-    def readRandomImage(tags: List[String])(urls: List[String]): (String, String, List[GelbooruService.Tag]) = {
-      case class Result(success: Option[(String, String, List[GelbooruService.Tag])] = None,
+    def readRandomImage(tags: List[String])(urls: List[String]): (String, String, List[BooruService.Tag]) = {
+      case class Result(success: Option[(String, String, List[BooruService.Tag])] = None,
         exception: Option[Exception] = None)
 
       val exclude = "solo" :: "1girl" :: "1boy" :: tags
@@ -228,7 +228,7 @@ trait GuessCommand extends Command {
         if (result.success.isEmpty) {
           http(pageUrl, proxy = true).runString(HttpFilters.ok) { response =>
             try {
-              val data = GelbooruService.parseHtml(response.body).flatMap { case (url, tags) =>
+              val data = BooruService.Gelbooru.parseHtml(response.body).flatMap { case (url, tags) =>
                 val workTags = tags.filter(t => !exclude.contains(t.title))
                 if (workTags.exists(_.character) && workTags.exists(_.other)) {
                   Some(url, pageUrl, workTags)
@@ -251,7 +251,7 @@ trait GuessCommand extends Command {
       }
     }
 
-    def createSession(url: String, pageUrl: String, tags: List[GelbooruService.Tag]): Future[Message] = {
+    def createSession(url: String, pageUrl: String, tags: List[BooruService.Tag]): Future[Message] = {
       val startCount = 10
       val shuffledTags = Random.shuffle(tags.filter(_.other).map(_.title))
       val knownTags = shuffledTags.take(startCount)

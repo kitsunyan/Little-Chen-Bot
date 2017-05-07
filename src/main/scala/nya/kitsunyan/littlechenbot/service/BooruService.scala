@@ -5,6 +5,8 @@ import nya.kitsunyan.littlechenbot.util.Utils
 import scala.util.matching.Regex
 
 sealed trait BooruService {
+  import BooruService._
+
   val iqdbId: String
   val aliases: List[Alias]
   def filterUrl(url: String): Boolean
@@ -29,17 +31,17 @@ sealed trait BooruService {
       }
     }.getOrElse(url)
   }
+}
 
+object BooruService {
   case class Tag(title: String)(val character: Boolean, val copyright: Boolean, val artist: Boolean) {
     def other: Boolean = !character && !copyright && !artist
   }
 
   case class Alias(name: String, primaryName: Boolean = false,
     primaryDomain: Boolean = false, replaceDomain: Boolean = false)
-}
 
-object BooruService {
-  val list: List[BooruService] = List(DanbooruService, YandereService, GelbooruService)
+  val list: List[BooruService] = List(Danbooru, Yandere, Gelbooru)
 
   def findByUrl(url: String): Option[BooruService] = {
     list.find(_.filterUrl(url))
@@ -48,108 +50,111 @@ object BooruService {
   def findByName(name: String): Option[BooruService] = {
     list.find(_.aliases.map(_.name).contains(name.toLowerCase))
   }
-}
 
-object DanbooruService extends BooruService {
-  override val iqdbId: String = "1"
-  override val aliases: List[Alias] =
-    Alias("danbooru", primaryName = true) ::
-    Alias("danbooru.donmai.us", primaryDomain = true) ::
-    Alias("hijiribe.donmai.us", replaceDomain = true) ::
-    Nil
+  object Danbooru extends BooruService {
+    override val iqdbId: String = "1"
 
-  override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
+    override val aliases: List[Alias] =
+      Alias("danbooru", primaryName = true) ::
+      Alias("danbooru.donmai.us", primaryDomain = true) ::
+      Alias("hijiribe.donmai.us", replaceDomain = true) ::
+      Nil
 
-  override def parseHtml(html: String): Option[(String, List[Tag])] = {
-    "data-file-url=\"(.*?)\"".r.findAllIn(html).matchData.map(_.subgroups.head).toList match {
-      case _ :+ imageUrl =>
-        val url = imageUrl match {
-          case i if i.startsWith("//") => "https:" + i
-          case i if i.startsWith("/") => "https://danbooru.donmai.us" + i
-          case i => i
-        }
+    override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
 
-        val tags = "<li class=\"category-(\\d+)\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
-          .findAllIn(html).matchData.map(_.subgroups).map {
-          case (category :: title :: Nil) =>
-            Tag(Utils.unescapeHtml(title))(category == "4", category == "3", category == "1")
-          case e => throw new MatchError(e)
-        }.toList.distinct
+    override def parseHtml(html: String): Option[(String, List[Tag])] = {
+      "data-file-url=\"(.*?)\"".r.findAllIn(html).matchData.map(_.subgroups.head).toList match {
+        case _ :+ imageUrl =>
+          val url = imageUrl match {
+            case i if i.startsWith("//") => "https:" + i
+            case i if i.startsWith("/") => "https://danbooru.donmai.us" + i
+            case i => i
+          }
 
-        Some(url, tags)
-      case _ => None
-    }
-  }
-}
+          val tags = "<li class=\"category-(\\d+)\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
+            .findAllIn(html).matchData.map(_.subgroups).map {
+            case (category :: title :: Nil) =>
+              Tag(Utils.unescapeHtml(title))(category == "4", category == "3", category == "1")
+            case e => throw new MatchError(e)
+          }.toList.distinct
 
-object YandereService extends BooruService {
-  override val iqdbId: String = "3"
-  override val aliases: List[Alias] =
-    Alias("yandere", primaryName = true) ::
-    Alias("yande.re", primaryDomain = true) ::
-    Nil
-
-  override def filterUrl(url: String): Boolean = url.contains("//yande.re")
-
-  override def parseHtml(html: String): Option[(String, List[Tag])] = {
-    def matchOption(r: Regex): Option[String] = r.findAllIn(html).matchData.map(_.subgroups.head).toList.headOption
-
-    // Two regex because unchanged images have more priority
-    (matchOption("<a class=\"original-file-unchanged\" .*?href=\"(.*?)\"".r) orElse
-      matchOption("<a class=\"original-file-changed\" .*?href=\"(.*?)\"".r)).map { imageUrl =>
-      val tags = "<li class=\".*?tag-type-(.*?)\" .*?data-name=\"(.*?)\"".r
-        .findAllIn(html).matchData.map(_.subgroups).map {
-        case (category :: title :: Nil) =>
-          Tag(Utils.unescapeHtml(title).replace('_', ' '))(category == "character",
-            category == "copyright", category == "artist")
-        case e => throw new MatchError(e)
-      }.toList.distinct
-
-      (imageUrl, tags)
-    }
-  }
-}
-
-object GelbooruService extends BooruService {
-  override val iqdbId: String = "4"
-  override val aliases: List[Alias] =
-    Alias("gelbooru", primaryName = true) ::
-    Alias("gelbooru.com", primaryDomain = true) ::
-    Nil
-
-  override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
-
-  override def parseHtml(html: String): Option[(String, List[Tag])] = {
-    "(?s)<!\\[CDATA\\[.*?(.*?)\\};.*?//\\]\\]>".r.findFirstMatchIn(html).flatMap { m =>
-      val map = "'(.*?)': ?(?:'(.*?)'|(\\w+))".r.findAllIn(m.subgroups.head).matchData.map { data =>
-        data.subgroups.head -> data.subgroups.tail
-      }.map { case (key, values) =>
-        if (values.head != null) (key, values.head) else (key, values.last)
-      }.toMap
-      try {
-        val url = Some(map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")).map { url =>
-          if (url.startsWith("//")) "https:" + url else url
-        }.get
-
-        val tags = "<li class=\"tag-type-(.*?)\"><a .*?page=post.*?>(.*?)</a>".r
-          .findAllIn(html).matchData.map(_.subgroups).map {
-          case (category :: title :: Nil) =>
-            Tag(Utils.unescapeHtml(title))(category == "character", category == "copyright", category == "artist")
-          case e => throw new MatchError(e)
-        }.toList.distinct
-
-        Some(url, tags)
-      } catch {
-        case _: NoSuchElementException => None
+          Some(url, tags)
+        case _ => None
       }
     }
   }
 
-  def parseListHtml(html: String): List[String] = {
-    "<a id=\"p\\d+\" href=\"(index.php?.*?id=\\d+)\".*?>".r
-      .findAllIn(html).matchData.map(_.subgroups).map {
-      case (url :: Nil) => s"http://gelbooru.com/${url.replace("&amp;", "&")}"
-      case e => throw new MatchError(e)
-    }.toList
+  object Yandere extends BooruService {
+    override val iqdbId: String = "3"
+
+    override val aliases: List[Alias] =
+      Alias("yandere", primaryName = true) ::
+      Alias("yande.re", primaryDomain = true) ::
+      Nil
+
+    override def filterUrl(url: String): Boolean = url.contains("//yande.re")
+
+    override def parseHtml(html: String): Option[(String, List[Tag])] = {
+      def matchOption(r: Regex): Option[String] = r.findAllIn(html).matchData.map(_.subgroups.head).toList.headOption
+
+      // Two regex because unchanged images have more priority
+      (matchOption("<a class=\"original-file-unchanged\" .*?href=\"(.*?)\"".r) orElse
+        matchOption("<a class=\"original-file-changed\" .*?href=\"(.*?)\"".r)).map { imageUrl =>
+        val tags = "<li class=\".*?tag-type-(.*?)\" .*?data-name=\"(.*?)\"".r
+          .findAllIn(html).matchData.map(_.subgroups).map {
+          case (category :: title :: Nil) =>
+            Tag(Utils.unescapeHtml(title).replace('_', ' '))(category == "character",
+              category == "copyright", category == "artist")
+          case e => throw new MatchError(e)
+        }.toList.distinct
+
+        (imageUrl, tags)
+      }
+    }
+  }
+
+  object Gelbooru extends BooruService {
+    override val iqdbId: String = "4"
+
+    override val aliases: List[Alias] =
+      Alias("gelbooru", primaryName = true) ::
+      Alias("gelbooru.com", primaryDomain = true) ::
+      Nil
+
+    override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
+
+    override def parseHtml(html: String): Option[(String, List[Tag])] = {
+      "(?s)<!\\[CDATA\\[.*?(.*?)\\};.*?//\\]\\]>".r.findFirstMatchIn(html).flatMap { m =>
+        val map = "'(.*?)': ?(?:'(.*?)'|(\\w+))".r.findAllIn(m.subgroups.head).matchData.map { data =>
+          data.subgroups.head -> data.subgroups.tail
+        }.map { case (key, values) =>
+          if (values.head != null) (key, values.head) else (key, values.last)
+        }.toMap
+        try {
+          val url = Some(map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")).map { url =>
+            if (url.startsWith("//")) "https:" + url else url
+          }.get
+
+          val tags = "<li class=\"tag-type-(.*?)\"><a .*?page=post.*?>(.*?)</a>".r
+            .findAllIn(html).matchData.map(_.subgroups).map {
+            case (category :: title :: Nil) =>
+              Tag(Utils.unescapeHtml(title))(category == "character", category == "copyright", category == "artist")
+            case e => throw new MatchError(e)
+          }.toList.distinct
+
+          Some(url, tags)
+        } catch {
+          case _: NoSuchElementException => None
+        }
+      }
+    }
+
+    def parseListHtml(html: String): List[String] = {
+      "<a id=\"p\\d+\" href=\"(index.php?.*?id=\\d+)\".*?>".r
+        .findAllIn(html).matchData.map(_.subgroups).map {
+        case (url :: Nil) => s"http://gelbooru.com/${url.replace("&amp;", "&")}"
+        case e => throw new MatchError(e)
+      }.toList
+    }
   }
 }
