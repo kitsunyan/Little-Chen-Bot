@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -12,8 +13,8 @@ trait RateCommand extends Command with ExtractImage {
 
   private val commands = List("rate", "r8")
 
-  override def prependDescription(list: List[Description]): List[Description] = {
-    super.prependDescription(Description(commands, "rate image") :: list)
+  override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
+    super.prependDescription(Description(commands, locale.RATE_IMAGE_FD) :: list, locale)
   }
 
   private val ratings =
@@ -34,7 +35,9 @@ trait RateCommand extends Command with ExtractImage {
     filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
+  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
+
     def sendEverypixelRequest(telegramFile: TelegramFile): Float = {
       http("https://quality.api.everypixel.com/v1/quality")
         .postMulti(telegramFile.multiPart("data")).runString(HttpFilters.ok) { response =>
@@ -43,7 +46,7 @@ trait RateCommand extends Command with ExtractImage {
 
         parse(response.body) \ "quality" \ "score" match {
           case JDouble(rating) => rating.toFloat
-          case _ => throw new CommandException("Invalid server response.")
+          case _ => throw new CommandException(locale.INVALID_SERVER_RESPONSE)
         }
       }
     }
@@ -60,9 +63,9 @@ trait RateCommand extends Command with ExtractImage {
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan("Rate image using everypixel.com.",
+        replyMan(locale.RATE_IMAGE_USING_EVERYPIXEL_COM,
           (List("-h", "--help"), None,
-            "Display this help.") ::
+            locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.recoverWith(handleError(None)(message))
     } else {
@@ -71,7 +74,7 @@ trait RateCommand extends Command with ExtractImage {
         .scopeFlatMap((_, file) => readTelegramFile(file)
           .map(sendEverypixelRequest)
           .flatMap(replyWithRating))
-        .recoverWith[Any](message)(handleError(Some("rating request")))
+        .recoverWith[Any](message)(handleError(Some(locale.RATING_REQUEST_FV_FS)))
     }
   }
 }

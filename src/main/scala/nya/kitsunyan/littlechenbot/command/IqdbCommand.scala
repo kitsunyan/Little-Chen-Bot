@@ -3,7 +3,7 @@ package nya.kitsunyan.littlechenbot.command
 import nya.kitsunyan.littlechenbot.command.common._
 import nya.kitsunyan.littlechenbot.database.IqdbConfigurationData
 import nya.kitsunyan.littlechenbot.service.BooruService
-import nya.kitsunyan.littlechenbot.util.Utils
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -15,15 +15,17 @@ trait IqdbCommand extends Command with ExtractImage {
 
   private val commands = List("iqdb")
 
-  override def prependDescription(list: List[Description]): List[Description] = {
-    super.prependDescription(Description(commands, "find image with iqdb") :: list)
+  override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
+    super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_IQDB_FD) :: list, locale)
   }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
+  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
+
     case class IqdbResult(index: Int, url: String, previewUrl: Option[String], blurMode: Utils.BlurMode,
       booruService: BooruService, alias: Option[String], similarity: Int, matches: Boolean)
 
@@ -116,7 +118,7 @@ trait IqdbCommand extends Command with ExtractImage {
       http(pageUrl, proxy = true).runString(HttpFilters.ok) { response =>
         iqdbResult.booruService.parseHtml(response.body) match {
           case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
-          case None => throw new Exception(s"Not parsed: $pageUrl.")
+          case None => throw new Exception(s"${locale.NOT_PARSED_FS}: $pageUrl.")
         }
       }
     }
@@ -147,8 +149,8 @@ trait IqdbCommand extends Command with ExtractImage {
       result.successImageData.getOrElse {
         val notFoundMessage = result.exception.map { e =>
           handleException(e, Some(messageWithImage))
-          "No images found (due to exception thrown)"
-        }.getOrElse("No images found")
+          locale.NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS
+        }.getOrElse(locale.NO_IMAGES_FOUND_FS)
 
         val (additionalResults, previewBlanks) = result.additionalIqdbResults.reverse.map { iqdbResult =>
           val index = iqdbResult.index + 1
@@ -167,9 +169,9 @@ trait IqdbCommand extends Command with ExtractImage {
           storeMessageToWorkspace(messageWithImage).map { requestIdString =>
             val insert = requestIdString.map(" " + _).getOrElse("")
             if (query) {
-              s"Results$insert:\n$additionalResults"
+              s"${locale.RESULTS_FS}$insert:\n$additionalResults"
             } else {
-              s"$notFoundMessage$insert.\n\nAdditional results:\n$additionalResults"
+              s"$notFoundMessage$insert.\n\n${locale.ADDITIONAL_RESULTS_FS}:\n$additionalResults"
             }
           }
         }
@@ -201,10 +203,10 @@ trait IqdbCommand extends Command with ExtractImage {
       }
 
       Some("")
-        .map(appendIterable("Characters", false, tags, _.character))
-        .map(appendIterable("Copyrights", false, tags, _.copyright))
-        .map(appendIterable("Artists", false, tags, _.artist))
-        .map(appendIterable("Tags", short, tags, _.other))
+        .map(appendIterable(locale.CHARACTERS_FS, false, tags, _.character))
+        .map(appendIterable(locale.COPYRIGTHS_FS, false, tags, _.copyright))
+        .map(appendIterable(locale.ARTISTS_FS, false, tags, _.artist))
+        .map(appendIterable(locale.TAGS_FS, short, tags, _.other))
         .filter(_.nonEmpty)
     }
 
@@ -310,7 +312,7 @@ trait IqdbCommand extends Command with ExtractImage {
     def printConfiguration(item: IqdbConfigurationData.Item): Future[Message] = {
       val minSimilarity = item.minSimilarity.map(_.toString).getOrElse("_default_")
       val priority = item.priority.map(_.reduce(_ + ", " + _)).map(clearMarkup).getOrElse("_default_")
-      replyQuote("Current configuration:\n" +
+      replyQuote(s"${locale.CURRENT_CONFIGURATION_FS}:\n" +
         s"\n`--min-similarity`: $minSimilarity" +
         s"\n`--priority`: $priority", Some(ParseMode.Markdown))
     }
@@ -337,67 +339,66 @@ trait IqdbCommand extends Command with ExtractImage {
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan("Fetch image from \\*booru using iqdb.org.",
+        replyMan(locale.FETCH_IMAGE_FROM_BOORU_USING_IQDB_ORG,
           (List("-i", "--index"), Some("integer"),
-            "Fetch image by specified index.") ::
+            locale.FETCH_IMAGE_BY_SPECIFIED_INDEX) ::
           (List("-q", "--query"), None,
-            "Query list of images without result.") ::
+            locale.QUERY_LIST_OF_IMAGES_WITHOUT_RESULT) ::
           (List("-t", "--tags"), None,
-            "Attach a complete list of tags to reply.") ::
+            locale.ATTACH_A_COMPLETE_LIST_OF_TAGS_TO_REPLY) ::
           (List("-s", "--min-similarity"), Some("0-100"),
-            "Set minimum allowed similarity for found images.") ::
+            locale.SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES) ::
           (List("-p", "--priority"), Some("string list"),
-            "Set priority for \\*booru services.") ::
+            locale.SET_PRIORITY_FOR_BOORU_SERVICES) ::
           (List("-c", "--configure"), None,
-            "Set default arguments for user. Specified `--priority` and `--min-similarity` " +
-            "arguments will be stored as default.") ::
+            locale.SET_DEFAULT_ARGUMENTS_FOR_USER_FORMAT.format("`--priority`", "`--min-similarity`")) ::
           (List("--reset"), None,
-            "Reset all default arguments. Can be used with `--configure` argument only.") ::
+            locale.RESET_ALL_DEFAULT_ARGUMENTS_FORMAT.format("`--configure`")) ::
           (List("--example"), None,
-            "Print examples of usage.") ::
+            locale.PRINT_EXAMPLES_OF_USAGE) ::
           (List("--list"), None,
-            "Print all supported \\*booru services.") ::
+            locale.PRINT_ALL_SUPPORTED_BOORU_SERVICES) ::
           (List("-h", "--help"), None,
-            "Display this help.") ::
+            locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.recoverWith(handleError(None)(message))
     } else if (arguments("example").nonEmpty) {
       checkArguments(arguments, "example").unitFlatMap {
-        replyQuote("Examples of usage:" +
-          "\n\nFetch image by index:" +
+        replyQuote(s"${locale.EXAMPLES_OF_USAGE_FS}:" +
+          s"\n\n${locale.FETCH_IMAGE_BY_INDEX_FS}:" +
           "\n    `/iqdb --index 2`" +
           "\n    `/iqdb -i 2`" +
-          "\n\nQuery list of images:" +
+          s"\n\n${locale.QUERY_LIST_OF_IMAGES_FS}:" +
           "\n    `/iqdb --query`" +
           "\n    `/iqdb -q`" +
-          "\n\nQuery image with tags:" +
+          s"\n\n${locale.QUERY_IMAGE_WITH_TAGS_FS}:" +
           "\n    `/iqdb --tags`" +
           "\n    `/iqdb -t`" +
-          "\n\nFetch first image with similarity >= 50%:" +
+          s"\n\n${locale.FETCH_WITH_SIMILARITY_50_FS}:" +
           "\n    `/iqdb --min-similarity 50`" +
           "\n    `/iqdb -s 50`" +
-          "\n\nFetch first image from danbooru if possible:" +
+          s"\n\n${locale.FETCH_FROM_DANBOORU_IF_POSSIBLE_FS}:" +
           "\n    `/iqdb --priority danbooru`" +
           "\n    `/iqdb -p danbooru`" +
-          "\n\nFetch first image from danbooru or gelbooru if possible:" +
+          s"\n\n${locale.FETCH_FROM_DANBOORU_OR_GELBOORU_IF_POSSIBLE_FS}:" +
           "\n    `/iqdb -p \"danbooru gelbooru\"`" +
-          "\n\nFetch first image from danbooru with similarity >= 50%:" +
+          s"\n\n${locale.FETCH_FROM_DANBOORU_WITH_SIMILARITY_50_FS}:" +
           "\n    `/iqdb -p danbooru -s 50`" +
-          "\n\nView configuration:" +
+          s"\n\n${locale.VIEW_CONFIGURATION_FS}:" +
           "\n    `/iqdb --configure`" +
           "\n    `/iqdb -c`" +
-          "\n\nUpdate configuration:" +
+          s"\n\n${locale.UPDATE_CONFIGURATION_FS}:" +
           "\n    `/iqdb -c -s 50`" +
           "\n    `/iqdb -c -p \"danbooru gelbooru\"`" +
           "\n    `/iqdb -c -s 40 -p danbooru`" +
-          "\n\nReset configuration:" +
+          s"\n\n${locale.RESET_CONFIGURATION_FS}:" +
           "\n    `/iqdb -c --reset`" +
           "\n    `/iqdb -c --reset -s 50`",
           Some(ParseMode.Markdown))
       }.recoverWith(handleError(None)(message))
     } else if (arguments("list").nonEmpty) {
       checkArguments(arguments, "list").unitFlatMap {
-        replyQuote("Supported \\*booru services:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
+        replyQuote(s"${locale.SUPPORTED_BOORU_SERVICES_FS}:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
           val primaryDomain = v.aliases.find(_.primaryDomain).get.name
           val aliases = v.aliases.filter(!_.primaryDomain).map(_.name).reduce(_ + "_, _" + _)
           val aliasesText = if (aliases.isEmpty) "" else s" (aliases: _${aliases}_)"
@@ -412,7 +413,7 @@ trait IqdbCommand extends Command with ExtractImage {
           .unitFlatMap(IqdbConfigurationData.get(userId))
           .map(configureItem(userId, similarityOption, priorityOption, reset))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
-          .recoverWith(handleError(Some("configuration handling"))(message))
+          .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
       }.getOrElse(Future.unit)
     } else {
       val indexOption = arguments("i", "index").asInt
@@ -436,7 +437,7 @@ trait IqdbCommand extends Command with ExtractImage {
           .map(readBooruImages(messageWithImage, query))
           .flatMap(replyWithImage(!tags))
           .flatMap((replyWithTags(tags) _).tupled))
-        .recoverWith[Any](message)(handleError(Some("image request")))
+        .recoverWith[Any](message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
     }
   }
 }

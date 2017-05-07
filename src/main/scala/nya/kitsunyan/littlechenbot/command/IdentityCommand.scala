@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.models._
 
@@ -9,20 +10,22 @@ import scala.concurrent.Future
 trait IdentityCommand extends Command {
   private val commands = List("identity", "id")
 
-  override def prependDescription(list: List[Description]): List[Description] = {
-    super.prependDescription(Description(commands, "who are you?") :: list)
+  override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
+    super.prependDescription(Description(commands, locale.WHO_ARE_YOU_FD) :: list, locale)
   }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.hard)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
+  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
+
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan("Get information about quoted user or yourself.",
+        replyMan(locale.GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF,
           (List("-h", "--help"), None,
-            "Display this help.") ::
+            locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.recoverWith(handleError(None)(message))
     } else {

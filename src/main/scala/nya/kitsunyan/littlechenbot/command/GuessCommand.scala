@@ -2,6 +2,7 @@ package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
 import nya.kitsunyan.littlechenbot.service.GelbooruService
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -21,21 +22,23 @@ trait GuessCommand extends Command {
 
   private val commands = List("guess")
 
-  override def prependDescription(list: List[Description]): List[Description] = {
-    super.prependDescription(Description(commands, "a small game in guessing a character") :: list)
+  override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
+    super.prependDescription(Description(commands, locale.A_SMALL_GAME_IN_GUESSING_A_CHARACTER_FD) :: list, locale)
   }
 
-  private case class Instance(future: Future[Option[Game]], messageIds: Set[Long], lastUpdateTime: Long) {
+  private case class Instance(future: Future[Option[Game]], messageIds: Set[Long],
+    lastUpdateTime: Long, locale: Locale) {
     def notExpired: Boolean = System.currentTimeMillis <= lastUpdateTime + 5 * 60 * 1000
   }
 
   private case class Game(characters: List[String], knownTags: List[String], hiddenTags: List[String],
     url: String, pageUrl: String)
 
-  private case class CreateGame(messageId: Long, game: Game)
+  private case class CreateGame(messageId: Long, game: Game, locale: Locale)
   private case class UpdateGame(key: Long, messageId: Long)
   private case class RemoveGame(key: Long)
-  private case class HandleRunningGame(replyToMessageId: Long, next: Long => Option[Game] => Future[Option[Game]])
+  private case class HandleRunningGame(replyToMessageId: Long,
+    next: (Long, Locale) => Option[Game] => Future[Option[Game]])
   private case object CleanupInstances
 
   private val actor = ActorSystem("GuessCommand").actorOf(Props(new GuessActor))
@@ -45,8 +48,9 @@ trait GuessCommand extends Command {
     private val instances = mutable.HashMap[Long, Instance]()
 
     def receive: PartialFunction[Any, Unit] = {
-      case CreateGame(messageId, game) =>
-        instances += messageId -> Instance(Future.successful(Some(game)), Set(messageId), System.currentTimeMillis)
+      case CreateGame(messageId, game, locale) =>
+        instances += messageId -> Instance(Future.successful(Some(game)), Set(messageId),
+          System.currentTimeMillis, locale)
         sender ! {}
       case UpdateGame(key, messageId) =>
         instances.get(key).foreach { instance =>
@@ -60,7 +64,7 @@ trait GuessCommand extends Command {
         val futureOption = instances.find { case (_, instance) =>
           instance.messageIds.contains(replyToMessageId)
         }.map { case (key, instance) =>
-          val newInstance = instance.copy(future = instance.future.flatMap(next(key)),
+          val newInstance = instance.copy(future = instance.future.flatMap(next(key, instance.locale)),
             lastUpdateTime = System.currentTimeMillis)
           instances += key -> newInstance
           newInstance.future
@@ -88,7 +92,10 @@ trait GuessCommand extends Command {
     }
   }
 
-  private def handleRunningGame(key: Long)(game: Option[Game])(implicit message: Message): Future[Option[Game]] = {
+  private def handleRunningGame(key: Long, locale: Locale)(game: Option[Game])
+    (implicit message: Message): Future[Option[Game]] = {
+    implicit val localeImplicit = locale
+
     def parseMessage(game: Game): Boolean = {
       def transformText(text: String): Set[String] = {
         text.replace('_', ' ')
@@ -131,7 +138,7 @@ trait GuessCommand extends Command {
     def replySuccessWithImage(game: Game): Future[Option[Nothing]] = {
       Future(readBooruImage(game.url)).flatMap { imageData =>
         val characters = game.characters.reduce(_ + ", " + _)
-        val text = s"A winner is you!\n\n${game.pageUrl}\n\nCharacters: $characters"
+        val text = s"${locale.A_WINNER_IS_YOU}\n\n${game.pageUrl}\n\n${locale.CHARACTERS_FS}: $characters"
 
         imageData.map { case (name, image) =>
           request(SendPhoto(Left(message.sender), Left(InputFile(name, image)),
@@ -148,8 +155,9 @@ trait GuessCommand extends Command {
         (Some(tag), game.copy(knownTags = tag :: game.knownTags, hiddenTags = game.hiddenTags.tail))
       }.getOrElse(None, game)
 
-      val text = "You are wrong!"
-      val fullText = tag.map(tag => s"$text\n\nNext tag: $tag").getOrElse(text)
+      val fullText = tag
+        .map(tag => s"${locale.YOU_ARE_WRONG}\n\n${locale.NEXT_TAG_FS}: $tag")
+        .getOrElse(locale.YOU_ARE_WRONG)
 
       replyQuote(fullText)
         .flatMap(m => actor ? UpdateGame(key, m.messageId))
@@ -165,7 +173,7 @@ trait GuessCommand extends Command {
     }
 
     val handleErrorInternal: PartialFunction[Throwable, Future[Option[Game]]] = {
-      case e: Exception => handleErrorCommon(e, message, Some("handling the session")).map(_ => game)
+      case e: Exception => handleErrorCommon(e, message, Some(locale.HANDLING_THE_SESSION_FV_FS)).map(_ => game)
     }
 
     game.map { game =>
@@ -174,7 +182,9 @@ trait GuessCommand extends Command {
     }.getOrElse(Future.successful(None))
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
+  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
+
     def queryImages(tags: List[String]): List[String] = {
       val fullTags = ("-rating:explicit" ::
         "-rating:questionable" ::
@@ -203,7 +213,7 @@ trait GuessCommand extends Command {
         if (urls.nonEmpty) {
           urls
         } else {
-          throw new CommandException("No images found.")
+          throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")
         }
       }
     }
@@ -237,7 +247,7 @@ trait GuessCommand extends Command {
       }
 
       result.success.getOrElse {
-        throw result.exception.getOrElse(new CommandException("No images found."))
+        throw result.exception.getOrElse(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}."))
       }
     }
 
@@ -248,17 +258,17 @@ trait GuessCommand extends Command {
       val hiddenTags = shuffledTags.drop(startCount)
 
       val game = Game(tags.filter(_.character).map(_.title), knownTags, hiddenTags, url, pageUrl)
-      replyQuote("Tags:\n\n" + game.knownTags.reduce(_ + "\n" + _))
-        .flatMap(m => (actor ? CreateGame(m.messageId, game)).map(_ => m))
+      replyQuote(s"${locale.TAGS_FS}:\n\n" + game.knownTags.reduce(_ + "\n" + _))
+        .flatMap(m => (actor ? CreateGame(m.messageId, game, locale)).map(_ => m))
     }
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan("A small game in guessing a character by booru tags.",
+        replyMan(locale.A_SMALL_GAME_IN_GUESSING_A_CHARACTER,
           (List("-t", "--tags"), Some("string list"),
-            "A list of tags to puzzle a character.") ::
+            locale.A_LIST_OF_TAGS_TO_PUZZLE_A_CHARACTER) ::
           (List("-h", "--help"), None,
-            "Display this help.") ::
+            locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.recoverWith(handleError(None)(message))
     } else {
@@ -270,7 +280,7 @@ trait GuessCommand extends Command {
         .unitMap(queryImages(tags))
         .map(readRandomImage(tags))
         .flatMap((createSession _).tupled)
-        .recoverWith(handleError(Some("creating a session"))(message))
+        .recoverWith(handleError(Some(locale.CREATING_A_SESSION_FV_FS))(message))
     }
   }
 }

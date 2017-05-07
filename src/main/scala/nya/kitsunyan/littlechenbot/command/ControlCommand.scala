@@ -1,7 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
-import nya.kitsunyan.littlechenbot.util.Utils
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -13,6 +13,10 @@ trait ControlCommand extends Command {
 
   private val commands = List("chenctl")
 
+  override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
+    super.prependDescription(Description(commands, locale.BOT_CONTROL_FD) :: list, locale)
+  }
+
   val restartProxyCommand: Option[Seq[String]]
 
   def chatForAlias(alias: String): Option[Long]
@@ -21,7 +25,9 @@ trait ControlCommand extends Command {
     filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
+  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
+
     def isOwnerMessage(implicit message: Message): Boolean = {
       botOwner.exists(id => message.from.exists(_.id == id))
     }
@@ -30,18 +36,19 @@ trait ControlCommand extends Command {
       checkArguments(arguments, "h", "help").unitFlatMap {
         val commands =
           (false, List("--check-proxy"), None,
-            "Check proxy available.") ::
+            locale.CHECK_PROXY_AVAILABLE) ::
           (true, List("--restart-proxy"), None,
-            "Restart proxy.") ::
+            locale.RESTART_PROXY) ::
           (true, List("-m", "--send-message"), Some("string"),
-            "Send message from bot.") ::
+            locale.SEND_MESSAGE_FROM_BOT) ::
           (true, List("-t", "--target-chat"), Some("long or string"),
-            "Target chat ID or alias for `--send-message`.") ::
+            locale.TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT.format("`--send-message`")) ::
           (false, List("-h", "--help"), None,
-            "Display this help.") ::
+            locale.DISPLAY_THIS_HELP) ::
           Nil
 
-        replyMan("Bot control and administration.", commands.flatMap { case (owner, parameters, values, description) =>
+        replyMan(locale.BOT_CONTROL_AND_ADMINISTRATION,
+          commands.flatMap { case (owner, parameters, values, description) =>
           if (!owner || isOwnerMessage) {
             Some(parameters, values, description)
           } else {
@@ -53,23 +60,23 @@ trait ControlCommand extends Command {
       checkArguments(arguments, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           Future(http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)(identity))
-            .flatMap(_ => replyQuote("It works!")).recoverWith {
-            case e: Exception => replyQuote(s"Everything is broken!\n${userMessageForException(e)}")
+            .flatMap(_ => replyQuote(locale.IT_WORKS)).recoverWith {
+            case e: Exception => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}")
           }
         } else {
-          replyQuote("Proxy is not present.")
+          replyQuote(locale.PROXY_IS_NOT_PRESENT)
         }
       }.recoverWith(handleError(None)(message))
     } else if (arguments("restart-proxy").nonEmpty && isOwnerMessage) {
       checkArguments(arguments, "restart-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           restartProxyCommand.map { restartProxyCommand =>
-            Future(Utils.exec(None, restartProxyCommand)).flatMap(_ => replyQuote("Ready!")).recoverWith {
-              case e: Exception => replyQuote(s"Something went wrong!\n${userMessageForException(e)}")
+            Future(Utils.exec(None, restartProxyCommand)).flatMap(_ => replyQuote(locale.READY)).recoverWith {
+              case e: Exception => replyQuote(s"${locale.SOMETHING_WENT_WRONG}\n${userMessageForException(e)}")
             }
-          }.getOrElse(replyQuote("I don't know how!"))
+          }.getOrElse(replyQuote(locale.I_DONT_KNOW_HOW))
         } else {
-          replyQuote("Proxy is not present.")
+          replyQuote(locale.PROXY_IS_NOT_PRESENT)
         }
       }.recoverWith(handleError(None)(message))
     } else if (arguments("m", "send-message").nonEmpty && isOwnerMessage) {
@@ -79,11 +86,12 @@ trait ControlCommand extends Command {
           .getOrElse(message.chat.id)
 
         request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
-          .recoverWith(handleError(Some("sending the message"))(message))
+          .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
       }.recoverWith(handleError(None)(message))
     } else {
       checkArguments(arguments).unitFlatMap {
-        replyQuote(s"Unknown command.\nType `/${commands.head} --help` to view help.", Some(ParseMode.Markdown))
+        replyQuote(locale.UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT.format(s"`/${commands.head} --help`"),
+          Some(ParseMode.Markdown))
       }.recoverWith(handleError(None)(message))
     }
   }

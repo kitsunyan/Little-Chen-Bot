@@ -1,7 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
-import nya.kitsunyan.littlechenbot.util.Utils
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
@@ -13,16 +13,16 @@ trait GoogleCommand extends Command with ExtractImage {
 
   private val commands = List("google")
 
-  override def prependDescription(list: List[Description]): List[Description] = {
-    super.prependDescription(Description(commands, "find image with google") :: list)
+  override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
+    super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_GOOGLE_FD) :: list, locale)
   }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments)(implicit message: Message): Future[Any] = {
-    val configurationErrorMessage = "Sorry, my configuration doesn't allow me to do it!"
+  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
 
     def sendGoogleRequest(telegramFile: TelegramFile): String = {
       http("https://images.google.com/searchbyimage/upload")
@@ -56,7 +56,7 @@ trait GoogleCommand extends Command with ExtractImage {
 
         result.sortWith(size(_) > size(_))
       } else {
-        throw new CommandException("No images found.")
+        throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")
       }
     }
 
@@ -68,7 +68,7 @@ trait GoogleCommand extends Command with ExtractImage {
         val json = compact(render(images.map("url" -> _.url)))
         request(SendMessage(Left(workspace), json))
           .map(m => (s"[request ${m.messageId}]", images))
-      }.getOrElse(Future.failed(new CommandException(configurationErrorMessage)))
+      }.getOrElse(Future.failed(new CommandException(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)))
     }
 
     def replyWithPreview(requestIdString: String, images: List[Image]): Future[Message] = {
@@ -79,7 +79,8 @@ trait GoogleCommand extends Command with ExtractImage {
         (index - 1, IndexedImage(index, image) :: result)
       }
 
-      val introduction = s"Here are the images I found $requestIdString.\nNow reply me with /${commands.head} -i N!\n"
+      val introduction = s"${locale.HERE_ARE_THE_IMAGES_I_FOUND_FS} $requestIdString.\n" +
+        s"${locale.NOW_REPLY_ME_WITH_FORMAT.format(s"/${commands.head} -i N")}\n"
       val messageText = indexedImages.foldLeft(introduction) { (result, indexedImage) =>
         val size = for {
           width <- indexedImage.image.width
@@ -138,9 +139,9 @@ trait GoogleCommand extends Command with ExtractImage {
             } else {
               None
             }
-          }.getOrElse(throw new CommandException("Are you kidding me?"))
+          }.getOrElse(throw new CommandException(locale.ARE_YOU_KIDDING_ME))
         }
-      }.getOrElse(Future.failed(new CommandException(configurationErrorMessage)))
+      }.getOrElse(Future.failed(new CommandException(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)))
     }
 
     case class ImageData(url: String, name: String, image: Array[Byte])
@@ -154,7 +155,7 @@ trait GoogleCommand extends Command with ExtractImage {
         }
         http(url, proxy = true).header("Referer", refererUrl)
           .runBytes(HttpFilters.ok)(response => ImageData(url, Utils.extractNameFromUrl(url), response.body))
-      }.getOrElse(throw new CommandException("No images found."))
+      }.getOrElse(throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}."))
     }
 
     def replyWithImage(asDocument: Boolean)(imageData: ImageData): Future[Message] = {
@@ -169,13 +170,13 @@ trait GoogleCommand extends Command with ExtractImage {
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan("Search image using images.google.com.",
+        replyMan(locale.SEARCH_IMAGES_USING_IMAGES_GOOGLE_COM,
           (List("-i", "--index"), Some("integer"),
-            "Fetch image by index. Only available when I've already found anything.") ::
+            locale.FETCH_IMAGE_BY_INDEX) ::
           (List("-d", "--as-document"), None,
-            "Fetch image as document in original quality.") ::
+            locale.FETCH_IMAGE_AS_DOCUMENT) ::
           (List("-h", "--help"), None,
-            "Display this help.") ::
+            locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.recoverWith(handleError(None)(message))
     } else {
@@ -187,7 +188,7 @@ trait GoogleCommand extends Command with ExtractImage {
           .unitFlatMap(extractUrlsListFromWorkspace)
           .map(fetchImageByIndex(index))
           .flatMap(replyWithImage(asDocument))
-          .recoverWith(handleError(Some("image request"))(message))
+          .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       } getOrElse {
         checkArguments(arguments)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
@@ -196,7 +197,7 @@ trait GoogleCommand extends Command with ExtractImage {
             .map(parseImages)
             .flatMap(storeResponseToWorkspace)
             .flatMap((replyWithPreview _).tupled))
-          .recoverWith[Any](message)(handleError(Some("image request")))
+          .recoverWith[Any](message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
       }
     }
   }

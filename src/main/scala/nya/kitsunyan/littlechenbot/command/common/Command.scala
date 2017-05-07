@@ -1,6 +1,6 @@
 package nya.kitsunyan.littlechenbot.command.common
 
-import nya.kitsunyan.littlechenbot.util.UserMessageException
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
@@ -22,11 +22,11 @@ trait Command extends BotBase with AkkaDefaults {
 
   case class Description(commands: List[String], text: String)
 
-  def prependDescription(list: List[Description]): List[Description] = list
+  def prependDescription(list: List[Description], locale: Locale): List[Description] = list
 
   def handleException(e: Throwable, causalMessage: Option[Message]): Unit
 
-  def handleError(during: Option[String])(causalMessage: Message)(implicit message: Message):
+  def handleError(during: Option[String])(causalMessage: Message)(implicit message: Message, locale: Locale):
     PartialFunction[Throwable, Future[Any]] = {
     case e: RecoverException =>
       e.future
@@ -37,9 +37,12 @@ trait Command extends BotBase with AkkaDefaults {
   }
 
   def handleErrorCommon(e: Exception, causalMessage: Message, during: Option[String])
-    (implicit message: Message): Future[Any] = {
+    (implicit message: Message, locale: Locale): Future[Any] = {
     handleException(e, Some(causalMessage))
-    replyQuote(s"An exception was thrown${during.map(" during " + _).getOrElse("")}.\n${userMessageForException(e)}")
+    val anExceptionWasThrown = during
+      .map(locale.AN_EXCEPTION_WAS_THROWN_FORMAT.format(_))
+      .getOrElse(locale.AN_EXCEPTION_WAS_THROWN)
+    replyQuote(s"$anExceptionWasThrown\n${userMessageForException(e)}")
   }
 
   def userMessageForException(e: Exception): String = {
@@ -77,13 +80,13 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  final def filterMessage(commands: List[String], success: Arguments => Future[Any], fail: => Future[Any],
+  final def filterMessage(commands: List[String], success: (Arguments, Locale) => Future[Any], fail: => Future[Any],
     allow: Boolean)(implicit message: Message): Future[Any] = {
     bot.flatMap { bot =>
       if (allow) {
         (message.text orElse message.caption)
           .flatMap(filterCommands(commands, bot.nickname))
-          .map(success).getOrElse(fail)
+          .map(success(_, Locale.English)).getOrElse(fail)
       } else {
         fail
       }
@@ -102,14 +105,14 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future.unit
 
-  def checkArguments(arguments: Arguments, possibleArguments: String*): Future[Unit] = {
+  def checkArguments(arguments: Arguments, possibleArguments: String*)(implicit locale: Locale): Future[Unit] = {
     val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String])
 
     if (invalidArguments.nonEmpty) {
       val printInvalidArgument = clearMarkup(invalidArguments.find(!_.isEmpty)
         .getOrElse(arguments.freeValue.asString.flatMap(_.split("\n").headOption).getOrElse("")))
 
-      Future.failed(new CommandException(s"Invalid argument: $printInvalidArgument."))
+      Future.failed(new CommandException(s"${locale.INVALID_ARGUMENT_FS}: $printInvalidArgument."))
     } else {
       Future.unit
     }
