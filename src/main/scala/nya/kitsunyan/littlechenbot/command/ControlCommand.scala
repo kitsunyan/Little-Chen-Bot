@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
+import nya.kitsunyan.littlechenbot.database.LocaleConfigurationData
 import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
@@ -43,6 +44,8 @@ trait ControlCommand extends Command {
             locale.SEND_MESSAGE_FROM_BOT) ::
           (true, List("-t", "--target-chat"), Some("long or string"),
             locale.TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT.format("`--send-message`")) ::
+          (false, List("--set-locale"), Some("string"),
+            locale.SET_LOCALE_FOR_THIS_CHAT) ::
           (false, List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil
@@ -87,6 +90,29 @@ trait ControlCommand extends Command {
 
         request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
           .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
+      }.recoverWith(handleError(None)(message))
+    } else if (arguments("set-locale").nonEmpty) {
+      checkArguments(arguments, "set-locale").unitFlatMap {
+        message.from.map { user =>
+          (if (message.chat.`type` == "private" || botOwner.contains(user.id)) {
+            Future.unit
+          } else {
+            request(GetChatAdministrators(Left(message.chat.id))).map { administators =>
+              if (!administators.map(_.user.id).contains(user.id)) {
+                throw new CommandException(locale.ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE)
+              }
+            }
+          }).unitFlatMap {
+            val localeString = arguments("set-locale").asString
+            localeString.flatMap(Locale.get).map { newLocale =>
+              LocaleConfigurationData.set(message.chat.id, newLocale)
+                .unitFlatMap(replyQuote(newLocale.LOCALE_INSTALLED))
+            }.getOrElse {
+              val locales = Locale.locales.map(_.name).reduceLeft(_ + ", " + _)
+              throw new CommandException(locale.INVALID_LOCALE_LIST_FORMAT.format(localeString.getOrElse(""), locales))
+            }
+          }.recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
+        }.getOrElse(throw new Exception("Can not obtain user ID."))
       }.recoverWith(handleError(None)(message))
     } else {
       checkArguments(arguments).unitFlatMap {

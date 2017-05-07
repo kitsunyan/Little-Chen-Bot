@@ -1,5 +1,6 @@
 package nya.kitsunyan.littlechenbot.command.common
 
+import nya.kitsunyan.littlechenbot.database.LocaleConfigurationData
 import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.api._
@@ -86,7 +87,9 @@ trait Command extends BotBase with AkkaDefaults {
       if (allow) {
         (message.text orElse message.caption)
           .flatMap(filterCommands(commands, bot.nickname))
-          .map(success(_, Locale.English)).getOrElse(fail)
+          .map(a => LocaleConfigurationData.get(message.chat.id)
+            .flatMap(l => success(a, l.getOrElse(Locale.English))))
+          .getOrElse(fail)
       } else {
         fail
       }

@@ -1,6 +1,8 @@
 package nya.kitsunyan.littlechenbot.util
 
 sealed trait Locale {
+  val name: String
+
   val A_LIST_OF_TAGS_TO_PUZZLE_A_CHARACTER: String
   val ADDITIONAL_RESULTS_FS: String
   val AN_EXCEPTION_WAS_THROWN_FORMAT: String
@@ -41,14 +43,17 @@ sealed trait Locale {
   val I_DONT_KNOW_HOW: String
   val IMAGE_REQUEST_FV_FS: String
   val INVALID_ARGUMENT_FS: String
+  val INVALID_LOCALE_LIST_FORMAT: String
   val INVALID_SERVER_RESPONSE: String
   val IT_WORKS: String
+  val LOCALE_INSTALLED: String
   val LIST_OF_SUPPORTED_COMMANDS_FS: String
   val NEXT_TAG_FS: String
   val NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS: String
   val NO_IMAGES_FOUND_FS: String
   val NOT_PARSED_FS: String
   val NOW_REPLY_ME_WITH_FORMAT: String
+  val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String
   val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String
   val PRINT_ALL_SUPPORTED_BOORU_SERVICES: String
   val PRINT_EXAMPLES_OF_USAGE: String
@@ -68,6 +73,7 @@ sealed trait Locale {
   val SENDING_THE_MESSAGE_FL_FS: String
   val SEND_MESSAGE_FROM_BOT: String
   val SET_DEFAULT_ARGUMENTS_FOR_USER_FORMAT: String
+  val SET_LOCALE_FOR_THIS_CHAT: String
   val SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES: String
   val SET_PRIORITY_FOR_BOORU_SERVICES: String
   val SOMETHING_WENT_WRONG: String
@@ -86,7 +92,13 @@ sealed trait Locale {
 }
 
 object Locale {
+  val locales: List[Locale] = List(English, Russian)
+
+  def get(name: String): Option[Locale] = locales.find(_.name == name)
+
   object English extends Locale {
+    override val name: String = "en"
+
     override val A_LIST_OF_TAGS_TO_PUZZLE_A_CHARACTER: String =
       "A list of tags to puzzle a character."
     override val ADDITIONAL_RESULTS_FS: String =
@@ -167,10 +179,14 @@ object Locale {
       "image request"
     override val INVALID_ARGUMENT_FS: String =
       "Invalid argument"
+    override val INVALID_LOCALE_LIST_FORMAT: String =
+      "Invalid locale: %s.\nSupported locales: %s."
     override val INVALID_SERVER_RESPONSE: String =
       "Invalid server response."
     override val IT_WORKS: String =
       "It works!"
+    override val LOCALE_INSTALLED: String =
+      "Locale intalled!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "List of supported commands"
     override val NEXT_TAG_FS: String =
@@ -183,6 +199,8 @@ object Locale {
       "Not parsed"
     override val NOW_REPLY_ME_WITH_FORMAT: String =
       "Now reply me with %s!"
+    override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
+      "Only administrator can change the locale."
     override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
       "Please reply to message with image or send image with command in caption.\n\n" +
       "Remember I can't see other bots' messages even when you reply them!\n\n" +
@@ -223,6 +241,8 @@ object Locale {
       "Send message from bot."
     override val SET_DEFAULT_ARGUMENTS_FOR_USER_FORMAT: String =
       "Set default arguments for user. Specified %s and %s arguments will be stored as default."
+    override val SET_LOCALE_FOR_THIS_CHAT: String =
+      "Set locale for this chat."
     override val SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES: String =
       "Set minimum allowed similarity for found images."
     override val SET_PRIORITY_FOR_BOORU_SERVICES: String =
@@ -256,6 +276,8 @@ object Locale {
   }
 
   object Russian extends Locale {
+    override val name: String = "ru"
+
     override val A_LIST_OF_TAGS_TO_PUZZLE_A_CHARACTER: String =
       "Список тегов чтобы загадать персонажа."
     override val ADDITIONAL_RESULTS_FS: String =
@@ -336,10 +358,14 @@ object Locale {
       "запросе картинки"
     override val INVALID_ARGUMENT_FS: String =
       "Аргумент инвалид"
+    override val INVALID_LOCALE_LIST_FORMAT: String =
+      "Некорректный язык: %s.\nПоддерживаемые языки: %s."
     override val INVALID_SERVER_RESPONSE: String =
       "Некорректный ответ сервера."
     override val IT_WORKS: String =
       "Оно работает!"
+    override val LOCALE_INSTALLED: String =
+      "Язык установлен!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "Список поддерживаемых команд"
     override val NEXT_TAG_FS: String =
@@ -352,6 +378,8 @@ object Locale {
       "Не распарсила"
     override val NOW_REPLY_ME_WITH_FORMAT: String =
       "Теперь ответь мне, написав %s!"
+    override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
+      "Только администратор может изменить язык."
     override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
       "Пожалуйста, ответь на сообщение с картинкой или отправь сообщение с командой в подписи.\n\n" +
       "Помни, я не могу видеть сообщения других ботов даже когда ты им отвечаешь!\n\n" +
@@ -392,6 +420,8 @@ object Locale {
       "Отправить сообщение от бота."
     override val SET_DEFAULT_ARGUMENTS_FOR_USER_FORMAT: String =
       "Установить аргументы по умолчанию для пользователя. Указанные аргументы %s и %s будут сохранены."
+    override val SET_LOCALE_FOR_THIS_CHAT: String =
+      "Установить язык для этого чата."
     override val SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES: String =
       "Установить минимальное сходство для найденых картинок."
     override val SET_PRIORITY_FOR_BOORU_SERVICES: String =

@@ -21,9 +21,10 @@ object SlickDatabase extends AkkaDefaults {
 
   private val iqdbConfiguration = TableQuery[IqdbConfigurationTable]
   private val iqdbConfigurationPriority = TableQuery[IqdbConfigurationPriorityTable]
+  private val localeConfiguration = TableQuery[LocaleConfigurationTable]
 
   // Create all tables
-  private val createFuture = List(iqdbConfiguration, iqdbConfigurationPriority)
+  private val createFuture = List(iqdbConfiguration, iqdbConfigurationPriority, localeConfiguration)
     .foldLeft[Future[Unit]](Future.unit) { (future, table) =>
     future.flatMap(_ => database.run(slick.jdbc.meta.MTable.getTables))
       .map(_.map(_.name.name).contains(table.baseTableRow.tableName)).flatMap { exists =>
@@ -45,6 +46,10 @@ object SlickDatabase extends AkkaDefaults {
 
     def iqdbConfigurationPriority: TableQuery[IqdbConfigurationPriorityTable] = {
       SlickDatabase.iqdbConfigurationPriority
+    }
+
+    def localeConfiguration: TableQuery[LocaleConfigurationTable] = {
+      SlickDatabase.localeConfiguration
     }
 
     class ExtendedDBIOAction[R](a: DBIOAction[R, NoStream, Nothing]) {
@@ -94,5 +99,16 @@ object SlickDatabase extends AkkaDefaults {
 
     override def * = (id, configurationId, booruService) <>
       (IqdbConfigurationData.Priority.tupled, IqdbConfigurationData.Priority.unapply)
+  }
+
+  // noinspection TypeAnnotation
+  protected class LocaleConfigurationTable(tag: Tag)
+    extends Table[LocaleConfigurationData.Item](tag, "locale_configuration") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def chatId = column[Long]("chat_id", O.Unique)
+    def locale = column[String]("locale")
+
+    override def * = (id, chatId, locale) <>
+      (LocaleConfigurationData.Item.tupled, LocaleConfigurationData.Item.unapply)
   }
 }
