@@ -379,7 +379,7 @@ object Locale {
     override val NOW_REPLY_ME_WITH_FORMAT: String =
       "Теперь ответь мне, написав %s!"
     override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
-      "Только администратор может изменить язык."
+      "Вы не модератор, чтобы указывать мне!"
     override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
       "Пожалуйста, ответь на сообщение с картинкой или отправь сообщение с командой в подписи.\n\n" +
       "Помни, я не могу видеть сообщения других ботов даже когда ты им отвечаешь!\n\n" +
