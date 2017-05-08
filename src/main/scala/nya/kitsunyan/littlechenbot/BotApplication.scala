@@ -1,7 +1,7 @@
 package nya.kitsunyan.littlechenbot
 
 import nya.kitsunyan.littlechenbot.command._
-import nya.kitsunyan.littlechenbot.command.common.Http
+import nya.kitsunyan.littlechenbot.command.common._
 import nya.kitsunyan.littlechenbot.util.Configuration
 
 import info.mukel.telegrambot4s.api._
@@ -13,11 +13,11 @@ import scala.concurrent.Future
 object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
-  object ShikigamiBot extends TelegramBot with Polling with Http with HelpCommand with ControlCommand with
+  object ShikigamiBot extends TelegramBot with CustomPolling with Http with HelpCommand with ControlCommand with
     IqdbCommand with RateCommand with GoogleCommand with GuessCommand with IdentityCommand {
     override def token: String = configuration.string("bot.token").get
     override val workspace: Option[Long] = configuration.long("bot.workspace")
-    override val bot: Future[Bot] = request(GetMe).map(m => Bot(m.username.getOrElse(""), m.id))
+    override val bot: Future[Bot] = getMe.map(m => Bot(m.username.getOrElse(""), m.id))
     override val botOwner: Option[Long] = configuration.long("bot.owner")
 
     private case class Chat(id: Long, alias: Option[String])
