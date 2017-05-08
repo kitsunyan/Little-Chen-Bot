@@ -48,12 +48,14 @@ sealed trait Locale {
   val IT_WORKS: String
   val LOCALE_INSTALLED: String
   val LIST_OF_SUPPORTED_COMMANDS_FS: String
+  val MESSAGE_SENT: String
   val NEXT_TAG_FS: String
   val NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS: String
   val NO_IMAGES_FOUND_FS: String
   val NOT_PARSED_FS: String
   val NOW_REPLY_ME_WITH_FORMAT: String
   val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String
+  val PERMISSION_IS_ALREADY_GRANTED: String
   val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String
   val PRINT_ALL_SUPPORTED_BOORU_SERVICES: String
   val PRINT_EXAMPLES_OF_USAGE: String
@@ -65,6 +67,7 @@ sealed trait Locale {
   val RATE_IMAGE_USING_EVERYPIXEL_COM: String
   val RATING_REQUEST_FV_FS: String
   val READY: String
+  val REQUEST_PERMISSION_TO_INTERACT_WITH_BOT: String
   val RESET_ALL_DEFAULT_ARGUMENTS_FORMAT: String
   val RESET_CONFIGURATION_FS: String
   val RESTART_PROXY: String
@@ -87,6 +90,7 @@ sealed trait Locale {
   val UPDATE_CONFIGURATION_FS: String
   val VIEW_CONFIGURATION_FS: String
   val WHO_ARE_YOU_FD: String
+  val YOU_ARE_NOT_PERMITTED_CONTACT_OWNER_FORMAT: String
   val YOU_ARE_WRONG: String
   val YOU_CAN_VIEW_A_HELP_FORMAT: String
 }
@@ -189,6 +193,8 @@ object Locale {
       "Locale intalled!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "List of supported commands"
+    override val MESSAGE_SENT: String =
+      "Message sent."
     override val NEXT_TAG_FS: String =
       "Next tag"
     override val NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS: String =
@@ -201,6 +207,8 @@ object Locale {
       "Now reply me with %s!"
     override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
       "Only administrator can change the locale."
+    override val PERMISSION_IS_ALREADY_GRANTED: String =
+      "Permission is already granted!"
     override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
       "Please reply to message with image or send image with command in caption.\n\n" +
       "Remember I can't see other bots' messages even when you reply them!\n\n" +
@@ -225,6 +233,8 @@ object Locale {
       "rating request"
     override val READY: String =
       "Ready!"
+    override val REQUEST_PERMISSION_TO_INTERACT_WITH_BOT: String =
+      "Request permission to interact with bot"
     override val RESET_ALL_DEFAULT_ARGUMENTS_FORMAT: String =
       "Reset all default arguments. Can be used with %s argument only."
     override val RESET_CONFIGURATION_FS: String =
@@ -269,6 +279,8 @@ object Locale {
       "View configuration"
     override val WHO_ARE_YOU_FD: String =
       "who are you?"
+    override val YOU_ARE_NOT_PERMITTED_CONTACT_OWNER_FORMAT: String =
+      "You are not permitted to use this bot.\nPlease, contact bot owner using %s command."
     override val YOU_ARE_WRONG: String =
       "You are wrong!"
     override val YOU_CAN_VIEW_A_HELP_FORMAT: String =
@@ -368,6 +380,8 @@ object Locale {
       "Язык установлен!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "Список поддерживаемых команд"
+    override val MESSAGE_SENT: String =
+      "Сообщение отправлено."
     override val NEXT_TAG_FS: String =
       "Следующий тег"
     override val NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS: String =
@@ -380,6 +394,8 @@ object Locale {
       "Теперь ответь мне, написав %s!"
     override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
       "Вы не модератор, чтобы указывать мне!"
+    override val PERMISSION_IS_ALREADY_GRANTED: String =
+      "Разрешение уже получено!"
     override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
       "Пожалуйста, ответь на сообщение с картинкой или отправь сообщение с командой в подписи.\n\n" +
       "Помни, я не могу видеть сообщения других ботов даже когда ты им отвечаешь!\n\n" +
@@ -404,6 +420,8 @@ object Locale {
       "запросе оценки"
     override val READY: String =
       "Готово!"
+    override val REQUEST_PERMISSION_TO_INTERACT_WITH_BOT: String =
+      "Запросить разрешение на взаимодействие с ботом"
     override val RESET_ALL_DEFAULT_ARGUMENTS_FORMAT: String =
       "Сбросить аргументы по умолчанию. Может быть использовано только с %s."
     override val RESET_CONFIGURATION_FS: String =
@@ -448,6 +466,8 @@ object Locale {
       "Посмотреть конфигурацию"
     override val WHO_ARE_YOU_FD: String =
       "кто ты?"
+    override val YOU_ARE_NOT_PERMITTED_CONTACT_OWNER_FORMAT: String =
+      "У тебя нет разрешения пользоваться ботом.\nПожалуйста, напиши владельцу бота используя команду %s."
     override val YOU_ARE_WRONG: String =
       "Не угадал!"
     override val YOU_CAN_VIEW_A_HELP_FORMAT: String =

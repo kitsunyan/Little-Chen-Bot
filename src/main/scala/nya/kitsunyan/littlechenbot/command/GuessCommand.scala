@@ -84,7 +84,7 @@ trait GuessCommand extends Command {
         message.replyToMessage.map { replyToMessage =>
           (actor ? HandleRunningGame(replyToMessage.messageId, handleRunningGame)).mapTo[Option[Future[Any]]]
         }.getOrElse(Future.successful(None)).flatMap(_.getOrElse {
-          filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
+          filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
         })
       }
     } else {

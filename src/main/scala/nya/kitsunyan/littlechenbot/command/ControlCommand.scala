@@ -23,43 +23,44 @@ trait ControlCommand extends Command {
   def chatForAlias(alias: String): Option[Long]
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
+    filterMessage(commands, handleMessageInternal(filterChat.soft), super.handleMessage, filterChat, _.hard)
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
+  private def handleMessageInternal(softFiltered: Boolean)
+    (arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def isOwnerMessage(implicit message: Message): Boolean = {
-      botOwner.exists(id => message.from.exists(_.id == id))
-    }
+    val ownerMessage = botOwner.exists(id => message.from.exists(_.id == id))
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
         val commands =
-          (false, List("--check-proxy"), None,
+          (true, false, List("--check-proxy"), None,
             locale.CHECK_PROXY_AVAILABLE) ::
-          (true, List("--restart-proxy"), None,
+          (true, true, List("--restart-proxy"), None,
             locale.RESTART_PROXY) ::
-          (true, List("-m", "--send-message"), Some("string"),
+          (true, true, List("-m", "--send-message"), Some("string"),
             locale.SEND_MESSAGE_FROM_BOT) ::
-          (true, List("-t", "--target-chat"), Some("long or string"),
+          (true, true, List("-t", "--target-chat"), Some("long or string"),
             locale.TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT.format("`--send-message`")) ::
-          (false, List("--set-locale"), Some("string"),
+          (true, false, List("--set-locale"), Some("string"),
             locale.SET_LOCALE_FOR_THIS_CHAT) ::
-          (false, List("-h", "--help"), None,
+          (false, false, List("--request-permission"), Some("string"),
+            locale.REQUEST_PERMISSION_TO_INTERACT_WITH_BOT) ::
+          (false, false, List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil
 
         replyMan(locale.BOT_CONTROL_AND_ADMINISTRATION,
-          commands.flatMap { case (owner, parameters, values, description) =>
-          if (!owner || isOwnerMessage) {
+          commands.flatMap { case (softFilteredOnly, ownerOnly, parameters, values, description) =>
+          if ((!ownerOnly || ownerMessage) && (!softFilteredOnly || softFiltered)) {
             Some(parameters, values, description)
           } else {
             None
           }
         })
       }.recoverWith(handleError(None)(message))
-    } else if (arguments("check-proxy").nonEmpty) {
+    } else if (softFiltered && arguments("check-proxy").nonEmpty) {
       checkArguments(arguments, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           Future(http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)(identity))
@@ -70,7 +71,7 @@ trait ControlCommand extends Command {
           replyQuote(locale.PROXY_IS_NOT_PRESENT)
         }
       }.recoverWith(handleError(None)(message))
-    } else if (arguments("restart-proxy").nonEmpty && isOwnerMessage) {
+    } else if (softFiltered && ownerMessage && arguments("restart-proxy").nonEmpty) {
       checkArguments(arguments, "restart-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           restartProxyCommand.map { restartProxyCommand =>
@@ -82,16 +83,17 @@ trait ControlCommand extends Command {
           replyQuote(locale.PROXY_IS_NOT_PRESENT)
         }
       }.recoverWith(handleError(None)(message))
-    } else if (arguments("m", "send-message").nonEmpty && isOwnerMessage) {
+    } else if (softFiltered && ownerMessage && arguments("m", "send-message").nonEmpty) {
       checkArguments(arguments, "m", "send-message", "t", "target-chat").unitFlatMap {
         val targetChatValue = arguments("t", "target-chat")
         val targetChat = (targetChatValue.asLong orElse targetChatValue.asString.flatMap(chatForAlias))
           .getOrElse(message.chat.id)
 
         request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
+          .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
           .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
       }.recoverWith(handleError(None)(message))
-    } else if (arguments("set-locale").nonEmpty) {
+    } else if (softFiltered && arguments("set-locale").nonEmpty) {
       checkArguments(arguments, "set-locale").unitFlatMap {
         message.from.map { user =>
           (if (message.chat.`type` == "private" || botOwner.contains(user.id)) {
@@ -114,11 +116,40 @@ trait ControlCommand extends Command {
           }.recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
         }.getOrElse(throw new Exception("Can not obtain user ID."))
       }.recoverWith(handleError(None)(message))
+    } else if (arguments("request-permission").nonEmpty) {
+      if (softFiltered) {
+        replyQuote(locale.PERMISSION_IS_ALREADY_GRANTED)
+      } else {
+        botOwner.map { botOwner =>
+          val chatId = message.chat.id
+          val username = message.chat.username.map("@" + _).getOrElse("unknown")
+          val requester = message.from.map(u => u.username
+            .getOrElse(u.lastName.map(u.firstName + " " + _).getOrElse(u.firstName)))
+            .getOrElse("unknown")
+          val requestMessage = arguments("request-permission").asString.filter(!_.isEmpty).getOrElse("empty message")
+          val ownerMessage = s"Permission request:\nChat ID: $chatId\nUsername: $username\n" +
+            s"Requester: $requester\nMessage: $requestMessage"
+
+          request(SendMessage(Left(botOwner), ownerMessage))
+            .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
+            .recoverWith(handleError(None)(message))
+        }.getOrElse {
+          replyQuote(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)
+        }
+      }
     } else {
       checkArguments(arguments).unitFlatMap {
         replyQuote(locale.UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT.format(s"`/${commands.head} --help`"),
           Some(ParseMode.Markdown))
       }.recoverWith(handleError(None)(message))
     }
+  }
+
+  override def handleNotPermittedWarning(locale: Locale)(implicit message: Message): Future[Any] = {
+    implicit val localeImplicit = locale
+
+    replyQuote(locale.YOU_ARE_NOT_PERMITTED_CONTACT_OWNER_FORMAT
+      .format("`/chenctl --request-permission \"Your message\"`"), Some(ParseMode.Markdown))
+      .recoverWith(handleError(None)(message))
   }
 }

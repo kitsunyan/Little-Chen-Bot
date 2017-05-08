@@ -18,7 +18,7 @@ trait GoogleCommand extends Command with ExtractImage {
   }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
+    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
   }
 
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {

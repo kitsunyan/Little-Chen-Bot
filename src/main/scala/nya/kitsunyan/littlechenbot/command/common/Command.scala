@@ -17,7 +17,7 @@ trait Command extends BotBase with AkkaDefaults {
   val workspace: Option[Long]
   val botOwner: Option[Long]
 
-  case class FilterChat(soft: Boolean, hard: Boolean)
+  case class FilterChat(soft: Boolean, hard: Boolean, filtered: Boolean = false)
 
   def filterChat(message: Message): FilterChat = FilterChat(true, true)
 
@@ -62,8 +62,13 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  private def filterCommands(commands: List[String], botNickname: String)(text: String): Option[Arguments] = {
-    commands.foldLeft[Option[Arguments]](None) { (a, command) =>
+  private def getLocale(chatId: Long): Future[Locale] = {
+    LocaleConfigurationData.get(chatId)
+      .map(_.getOrElse(Locale.English))
+  }
+
+  private def filterCommands(commands: List[String], botNickname: String)(text: String): Option[String] = {
+    commands.foldLeft[Option[String]](None) { (a, command) =>
       a orElse {
         val shortCommand = "/" + command
         val longCommand = shortCommand + "@" + botNickname
@@ -76,23 +81,23 @@ trait Command extends BotBase with AkkaDefaults {
           } else {
             None
           }
-        }.reduceLeft(_ orElse _).map(new Arguments(_))
+        }.reduceLeft(_ orElse _)
       }
     }
   }
 
-  final def filterMessage(commands: List[String], success: (Arguments, Locale) => Future[Any], fail: => Future[Any],
-    allow: Boolean)(implicit message: Message): Future[Any] = {
+  final def filterMessage(commands: List[String], success: (Arguments, Locale) => Future[Any],
+    fail: FilterChat => Future[Any], filterChat: FilterChat, allow: FilterChat => Boolean)
+    (implicit message: Message): Future[Any] = {
     bot.flatMap { bot =>
-      if (allow) {
-        (message.text orElse message.caption)
-          .flatMap(filterCommands(commands, bot.nickname))
-          .map(a => LocaleConfigurationData.get(message.chat.id)
-            .flatMap(l => success(a, l.getOrElse(Locale.English))))
-          .getOrElse(fail)
-      } else {
-        fail
-      }
+      (message.text orElse message.caption)
+        .flatMap(filterCommands(commands, bot.nickname)).map { commandLine =>
+        if (allow(filterChat)) {
+          getLocale(message.chat.id).flatMap(success(new Arguments(commandLine), _))
+        } else {
+          fail(filterChat.copy(filtered = true))
+        }
+      }.getOrElse(fail(filterChat))
     }
   }
 
@@ -106,7 +111,15 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = Future.unit
+  def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+    if (filterChat.hard && !filterChat.soft && filterChat.filtered) {
+      getLocale(message.chat.id).flatMap(handleNotPermittedWarning)
+    } else {
+      Future.unit
+    }
+  }
+
+  def handleNotPermittedWarning(locale: Locale)(implicit message: Message): Future[Any] = Future.unit
 
   def checkArguments(arguments: Arguments, possibleArguments: String*)(implicit locale: Locale): Future[Unit] = {
     val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String])

@@ -32,7 +32,7 @@ trait RateCommand extends Command with ExtractImage {
     Nil
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.soft)
+    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
   }
 
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {

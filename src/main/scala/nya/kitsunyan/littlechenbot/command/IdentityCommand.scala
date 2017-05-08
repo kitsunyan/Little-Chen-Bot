@@ -15,7 +15,7 @@ trait IdentityCommand extends Command {
   }
 
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage(filterChat), filterChat.hard)
+    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.hard)
   }
 
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
