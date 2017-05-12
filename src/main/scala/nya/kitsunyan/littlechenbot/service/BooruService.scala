@@ -65,11 +65,7 @@ object BooruService {
     override def parseHtml(html: String): Option[(String, List[Tag])] = {
       "data-file-url=\"(.*?)\"".r.findAllIn(html).matchData.map(_.subgroups.head).toList match {
         case _ :+ imageUrl =>
-          val url = imageUrl match {
-            case i if i.startsWith("//") => "https:" + i
-            case i if i.startsWith("/") => "https://danbooru.donmai.us" + i
-            case i => i
-          }
+          val url = Utils.appendSchemeHost(true, "danbooru.donmai.us")(imageUrl)
 
           val tags = "<li class=\"category-(\\d+)\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
             .findAllIn(html).matchData.map(_.subgroups).map {
@@ -131,9 +127,8 @@ object BooruService {
           if (values.head != null) (key, values.head) else (key, values.last)
         }.toMap
         try {
-          val url = Some(map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img")).map { url =>
-            if (url.startsWith("//")) "https:" + url else url
-          }.get
+          val url = Utils.appendSchemeHost(true, "gelbooru.com")
+            .apply(map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img"))
 
           val tags = "<li class=\"tag-type-(.*?)\"><a .*?page=post.*?>(.*?)</a>".r
             .findAllIn(html).matchData.map(_.subgroups).map {
