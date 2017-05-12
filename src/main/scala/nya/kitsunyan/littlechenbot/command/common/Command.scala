@@ -187,6 +187,26 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
+  object WorkspaceRequest {
+    def apply(command: String)(id: Long): String = {
+      s"[request:$command:$id]"
+    }
+
+    def parse(command: String)(message: String)(implicit locale: Locale): Option[Long] = {
+      "\\[request:(\\w+?):(-?\\d+)\\]".r.findFirstMatchIn(message)
+        .map(_.subgroups)
+        .map(g => (g(0), g(1).toLong))
+        .map { case (parsedCommand, id) =>
+        if (parsedCommand == command) {
+          id
+        } else {
+          throw new CommandException(locale.DIFFERENT_COMMANDS_FORMAT.format(s"`/$command`", s"`/$parsedCommand`"),
+            Some(ParseMode.Markdown))
+        }
+      }
+    }
+  }
+
   class RecoverableFuture[A, B, R](future: Future[(A, B)], callback: (A, B) => Future[R]) {
     def recoverWith[T >: R](defaultValue: A)(recover: A => PartialFunction[Throwable, Future[T]]): Future[T] = {
       future.flatMap { case (a, b) =>

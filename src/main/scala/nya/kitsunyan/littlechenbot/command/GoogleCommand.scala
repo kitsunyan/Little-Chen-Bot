@@ -67,7 +67,9 @@ trait GoogleCommand extends Command with ExtractImage {
       workspace.map { workspace =>
         val json = compact(render(images.map("url" -> _.url)))
         request(SendMessage(Left(workspace), json))
-          .map(m => (s"[request ${m.messageId}]", images))
+          .map(_.messageId)
+          .map(WorkspaceRequest(commands.head))
+          .map((_, images))
       }.getOrElse(Future.failed(new CommandException(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)))
     }
 
@@ -118,9 +120,7 @@ trait GoogleCommand extends Command with ExtractImage {
           message.replyToMessage.flatMap { message =>
             if ((message.forwardFrom orElse message.from).map(_.id.toLong).contains(bot.id)) {
               (message.text orElse message.caption)
-                .flatMap("\\[request (-?\\d+)\\]".r.findFirstMatchIn)
-                .flatMap(_.subgroups.headOption)
-                .map(_.toLong)
+                .flatMap(WorkspaceRequest.parse(commands.head))
                 .map { messageId =>
                 request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
                   .map(_.replyToMessage.flatMap(_.text).map { text =>

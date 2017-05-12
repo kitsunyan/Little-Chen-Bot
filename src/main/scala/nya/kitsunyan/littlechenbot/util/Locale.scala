@@ -21,6 +21,7 @@ sealed trait Locale {
   val COPYRIGTHS_FS: String
   val CREATING_A_SESSION_FV_FS: String
   val CURRENT_CONFIGURATION_FS: String
+  val DIFFERENT_COMMANDS_FORMAT: String
   val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String
   val DISPLAY_THIS_HELP_FD: String
   val DISPLAY_THIS_HELP: String
@@ -139,6 +140,8 @@ object Locale {
       "creating a session"
     override val CURRENT_CONFIGURATION_FS: String =
       "Current configuration"
+    override val DIFFERENT_COMMANDS_FORMAT: String =
+      "%s and %s are different commands!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
       "Display list of supported commands."
     override val DISPLAY_THIS_HELP_FD: String =
@@ -326,6 +329,8 @@ object Locale {
       "создании сессии"
     override val CURRENT_CONFIGURATION_FS: String =
       "Текущая конфигурация"
+    override val DIFFERENT_COMMANDS_FORMAT: String =
+      "%s и %s — разные команды!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
       "Отображение списка поддерживаемых команд."
     override val DISPLAY_THIS_HELP_FD: String =

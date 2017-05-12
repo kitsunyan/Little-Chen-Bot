@@ -257,7 +257,8 @@ trait IqdbCommand extends Command with ExtractImage {
     def storeMessageToWorkspace(messageWithImage: Message): Future[Option[String]] = {
       workspace.map { workspace =>
         request(ForwardMessage(Left(workspace), Left(messageWithImage.chat.id), None, messageWithImage.messageId))
-          .map(m => Some(s"[request ${m.messageId}]"))
+          .map(_.messageId)
+          .map(WorkspaceRequest(commands.head) _ andThen Some.apply)
           .recover {
           case e: Throwable =>
             handleException(e, Some(message))
@@ -271,9 +272,7 @@ trait IqdbCommand extends Command with ExtractImage {
         bot.flatMap { bot =>
           if ((message.forwardFrom orElse message.from).map(_.id.toLong).contains(bot.id)) {
             (message.text orElse message.caption)
-              .flatMap("\\[request (-?\\d+)\\]".r.findFirstMatchIn)
-              .flatMap(_.subgroups.headOption)
-              .map(_.toLong)
+              .flatMap(WorkspaceRequest.parse(commands.head))
               .map { messageId =>
               request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
                 .map(_.replyToMessage)
