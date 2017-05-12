@@ -150,10 +150,20 @@ object BooruService {
     }
 
     def parseListHtml(html: String): List[String] = {
-      "<a id=\"p\\d+\" href=\"(index.php?.*?id=\\d+)\".*?>".r
-        .findAllIn(html).matchData.map(_.subgroups).map {
-        case (url :: Nil) => s"http://gelbooru.com/${url.replace("&amp;", "&")}"
-        case e => throw new MatchError(e)
+      "<a id=\"p\\d+\" href=\"(?:(.*?index.php\\?.*?id=\\d+.*?)|(.*?redirect.php\\?.*?s=.*?))\".*?>".r
+        .findAllIn(html).matchData.map(_.subgroups).flatMap {
+        case (pageUrl :: obfuscatedUrl :: Nil) =>
+          Option(obfuscatedUrl)
+            .map(Utils.appendSchemeHost(true, "gelbooru.com"))
+            .map(new java.net.URL(_))
+            .map(Utils.getUrlParameters)
+            .flatMap(_.get("s").flatten)
+            .map(java.util.Base64.getDecoder.decode)
+            .map(new String(_))
+            .orElse(Option(pageUrl).map(_.replace("&amp;", "&")))
+            .map(Utils.appendSchemeHost(true, "gelbooru.com"))
+        case e =>
+          throw new MatchError(e)
       }.toList
     }
   }

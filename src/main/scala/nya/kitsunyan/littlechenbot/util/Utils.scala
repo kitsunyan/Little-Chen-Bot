@@ -172,4 +172,19 @@ object Utils {
     val name = if (end >= start) url.substring(start, end) else url.substring(start)
     java.net.URLDecoder.decode(name, "UTF-8")
   }
+
+  private def schemeBoolean(https: Boolean): String = {
+    if (https) {
+      "https"
+    } else {
+      "http"
+    }
+  }
+
+  def appendSchemeHost(https: Boolean, host: String): PartialFunction[String, String] = {
+    case s if s.startsWith("//") => s"${schemeBoolean(https)}:$s"
+    case s if s.startsWith("/") => s"${schemeBoolean(https)}://$host$s"
+    case s if s.startsWith("http://") || s.startsWith("https://") => s
+    case s => s"${schemeBoolean(https)}://$host/$s"
+  }
 }
