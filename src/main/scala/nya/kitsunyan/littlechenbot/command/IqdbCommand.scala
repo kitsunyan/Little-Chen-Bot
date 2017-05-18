@@ -147,10 +147,9 @@ trait IqdbCommand extends Command with ExtractImage {
       }
 
       result.successImageData.getOrElse {
-        val notFoundMessage = result.exception.map { e =>
-          handleException(e, Some(messageWithImage))
-          locale.NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS
-        }.getOrElse(locale.NO_IMAGES_FOUND_FS)
+        val notFoundMessage = result.exception
+          .map(_ => locale.NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS)
+          .getOrElse(locale.NO_IMAGES_FOUND_FS)
 
         val (additionalResults, previewBlanks) = result.additionalIqdbResults.reverse.map { iqdbResult =>
           val index = iqdbResult.index + 1
@@ -176,9 +175,10 @@ trait IqdbCommand extends Command with ExtractImage {
           }
         }
 
-        throw (if (additionalResults.isEmpty) result.exception else None)
-          .getOrElse(new RecoverException(messageTextFuture
-            .flatMap(replyWithQueryList(messageWithImage, _, previewBlanks))))
+        throw (if (additionalResults.isEmpty) result.exception else None).getOrElse {
+          result.exception.map(handleException(_, Some(messageWithImage)))
+          new RecoverException(messageTextFuture.flatMap(replyWithQueryList(messageWithImage, _, previewBlanks)))
+        }
       }
     }
 
