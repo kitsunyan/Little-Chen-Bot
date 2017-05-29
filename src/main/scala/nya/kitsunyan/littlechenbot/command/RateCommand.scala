@@ -48,7 +48,37 @@ trait RateCommand extends Command with ExtractImage {
         .getOrElse(throw new CommandException(s"${locale.NOT_PARSED_FS}: $url."))
     }
 
-    def sendEverypixelRequest(typedFile: TypedFile, token: String): Float = {
+    def obtainEverypixelTags(typedFile: TypedFile, token: String): List[String] = {
+      http("https://keywording.api.everypixel.com/v1/keywords")
+        .header("Authorization", s"Bearer $token")
+        .file(typedFile.multipart("data")).runString(HttpFilters.ok) { response =>
+        import org.json4s._
+        import org.json4s.jackson.JsonMethods._
+
+        parse(response.body) \ "keywords" match {
+          case JArray(array) =>
+            array.map(_ \ "keyword" match {
+              case JString(s) => s
+              case _ => throw new CommandException(locale.INVALID_SERVER_RESPONSE)
+            })
+          case _ => throw new CommandException(locale.INVALID_SERVER_RESPONSE)
+        }
+      }
+    }
+
+    case class EverypixelData(quality: Float, tags: List[String])
+
+    def sendEverypixelRequest(typedFile: TypedFile, token: String): Future[EverypixelData] = {
+      val qualityFuture = Future(obtainEverypixelQuality(typedFile, token))
+      val tagsFuture = Future(obtainEverypixelTags(typedFile, token))
+
+      for {
+        quality <- qualityFuture
+        tags <- tagsFuture
+      } yield EverypixelData(quality, tags)
+    }
+
+    def obtainEverypixelQuality(typedFile: TypedFile, token: String): Float = {
       http("https://quality.api.everypixel.com/v1/quality")
         .header("Authorization", s"Bearer $token")
         .file(typedFile.multipart("data")).runString(HttpFilters.ok) { response =>
@@ -62,14 +92,24 @@ trait RateCommand extends Command with ExtractImage {
       }
     }
 
-    def replyWithRating(rating: Float): Future[Message] = {
-      val value = {
-        val tmp = (rating * 10).toInt
-        if (tmp > 10) 10 else if (tmp < 0) 0 else tmp
+    def replyWithRating(everypixelData: EverypixelData): Future[Message] = {
+      val quality = {
+        val quality = (everypixelData.quality * 10).toInt
+        if (quality > 10) 10 else if (quality < 0) 0 else quality
       }
 
-      request(SendSticker(Left(message.sender), Right(ratings(value)),
+      val messageFuture = request(SendSticker(Left(message.sender), Right(ratings(quality)),
         replyToMessageId = Some(message.replyToMessage.getOrElse(message).messageId)))
+
+      if (everypixelData.tags.nonEmpty) {
+        messageFuture.flatMap { message =>
+          val tags = everypixelData.tags.reduce(_ + ", " + _).toLowerCase(java.util.Locale.US)
+          val text = s"${locale.TAGS_FS}: $tags"
+          request(SendMessage(Left(message.sender), text, replyToMessageId = Some(message.messageId)))
+        }
+      } else {
+        messageFuture
+      }
     }
 
     if (arguments("h", "help").nonEmpty) {
@@ -84,7 +124,7 @@ trait RateCommand extends Command with ExtractImage {
         .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
           .zip(Future(obtainEverypixelToken))
-          .map((sendEverypixelRequest _).tupled)
+          .flatMap((sendEverypixelRequest _).tupled)
           .flatMap(replyWithRating))
         .recoverWith[Any](message)(handleError(Some(locale.RATING_REQUEST_FV_FS)))
     }
