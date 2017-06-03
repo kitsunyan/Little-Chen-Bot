@@ -13,17 +13,18 @@ import scala.concurrent.Future
 object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
-  object ShikigamiBot extends TelegramBot with CustomPolling with Http with HelpCommand with ControlCommand with
-    IqdbCommand with RateCommand with GoogleCommand with GuessCommand with IdentityCommand {
+  object ShikigamiBot extends TelegramBot with CustomPolling with Http with ForemanCommand with HelpCommand with
+    ControlCommand with IqdbCommand with RateCommand with GoogleCommand with GuessCommand with IdentityCommand {
     override def token: String = configuration.string("bot.token").get
+
     override val workspace: Option[Long] = configuration.long("bot.workspace")
     override val bot: Future[Bot] = getMe.map(m => Bot(m.username.getOrElse(""), m.id))
     override val botOwner: Option[Long] = configuration.long("bot.owner")
 
-    private case class Chat(id: Long, alias: Option[String])
+    private case class Chat(id: Long, alias: Option[String], foreignCommands: Option[List[String]])
 
     private val chats = configuration.configurationList("bot.chats")
-      .flatMap(c => c.long("id").map(Chat(_, c.string("alias"))))
+      .flatMap(c => c.long("id").map(Chat(_, c.string("alias"), c.stringList("foreignCommands"))))
 
     private val chatsAnyPrivate = configuration.boolean("bot.chatsAnyPrivate").getOrElse(false)
     private val chatsAnyGroup = configuration.boolean("bot.chatsAnyGroup").getOrElse(false)
@@ -47,6 +48,12 @@ object BotApplication extends App {
     override def chatForAlias(alias: String): Option[Long] = {
       chats.find(_.alias.contains(alias)).map(_.id)
     }
+
+    override def foreignCommands(chatId: Long): Option[List[String]] = {
+      chats.find(_.id == chatId).flatMap(_.foreignCommands)
+    }
+
+    override def foremanImage: Option[String] = configuration.string("bot.foremanImage")
 
     override def filterChat(message: Message): FilterChat = {
       if (message.date < startTime) {
