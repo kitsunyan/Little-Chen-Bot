@@ -98,14 +98,14 @@ trait RateCommand extends Command with ExtractImage {
         if (quality > 10) 10 else if (quality < 0) 0 else quality
       }
 
-      val messageFuture = request(SendSticker(Left(message.sender), Right(ratings(quality)),
+      val messageFuture = request(SendSticker(Left(message.source), Right(ratings(quality)),
         replyToMessageId = Some(message.replyToMessage.getOrElse(message).messageId)))
 
       if (everypixelData.tags.nonEmpty) {
         messageFuture.flatMap { message =>
           val tags = everypixelData.tags.reduce(_ + ", " + _).toLowerCase(java.util.Locale.US)
           val text = s"${locale.TAGS_FS}: $tags"
-          request(SendMessage(Left(message.sender), text, replyToMessageId = Some(message.messageId)))
+          request(SendMessage(Left(message.source), text, replyToMessageId = Some(message.messageId)))
         }
       } else {
         messageFuture

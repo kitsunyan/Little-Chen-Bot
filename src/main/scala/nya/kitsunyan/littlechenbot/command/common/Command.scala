@@ -136,12 +136,12 @@ trait Command extends BotBase with AkkaDefaults {
 
   def replyQuote(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {
-    request(SendMessage(Left(message.sender), text, parseMode, replyToMessageId = Some(message.messageId)))
+    request(SendMessage(Left(message.source), text, parseMode, replyToMessageId = Some(message.messageId)))
   }
 
   def reply(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {
-    request(SendMessage(Left(message.sender), text, parseMode))
+    request(SendMessage(Left(message.source), text, parseMode))
   }
 
   def replyMan(description: String, list: List[(List[String], Option[String], String)])

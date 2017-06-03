@@ -108,7 +108,7 @@ trait GoogleCommand extends Command with ExtractImage {
       }.flatMap { list =>
         val preview = Utils.drawPreview(list)
         preview.map { preview =>
-          request(SendPhoto(Left(message.sender), Left(InputFile("preview.png", preview)),
+          request(SendPhoto(Left(message.source), Left(InputFile("preview.png", preview)),
             replyToMessageId = Some(message.messageId), caption = Some(trimCaption(messageText))))
         }.getOrElse(replyQuote(messageText))
       }
@@ -160,10 +160,10 @@ trait GoogleCommand extends Command with ExtractImage {
 
     def replyWithImage(asDocument: Boolean)(imageData: ImageData): Future[Message] = {
       if (asDocument) {
-        request(SendDocument(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
+        request(SendDocument(Left(message.source), Left(InputFile(imageData.name, imageData.image)),
           replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
       } else {
-        request(SendPhoto(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
+        request(SendPhoto(Left(message.source), Left(InputFile(imageData.name, imageData.image)),
           replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
       }
     }

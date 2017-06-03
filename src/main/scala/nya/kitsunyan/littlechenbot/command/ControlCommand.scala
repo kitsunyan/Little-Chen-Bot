@@ -96,7 +96,7 @@ trait ControlCommand extends Command {
     } else if (softFiltered && arguments("set-locale").nonEmpty) {
       checkArguments(arguments, "set-locale").unitFlatMap {
         message.from.map { user =>
-          (if (message.chat.`type` == "private" || botOwner.contains(user.id)) {
+          (if (message.chat.`type` == ChatType.Private || botOwner.contains(user.id)) {
             Future.unit
           } else {
             request(GetChatAdministrators(Left(message.chat.id))).map { administators =>

@@ -214,7 +214,7 @@ trait IqdbCommand extends Command with ExtractImage {
       val captionOption = (if (displayTags) collectTags(true, imageData.tags) else None)
         .map(imageData.pageUrl + "\n" + _) orElse Some(imageData.pageUrl)
 
-      request(SendDocument(Left(message.sender), Left(InputFile(imageData.name, imageData.image)),
+      request(SendDocument(Left(message.source), Left(InputFile(imageData.name, imageData.image)),
         replyToMessageId = Some(message.messageId), caption = captionOption))
         .map((imageData, _))
     }
@@ -245,7 +245,7 @@ trait IqdbCommand extends Command with ExtractImage {
         }.flatMap { list =>
           val preview = Utils.drawPreview(list)
           preview.map { preview =>
-            request(SendPhoto(Left(message.sender), Left(InputFile("preview.png", preview)),
+            request(SendPhoto(Left(message.source), Left(InputFile("preview.png", preview)),
               replyToMessageId = Some(message.messageId), caption = Some(trimCaption(messageText))))
           }.getOrElse(replyQuote(messageText))
         }
