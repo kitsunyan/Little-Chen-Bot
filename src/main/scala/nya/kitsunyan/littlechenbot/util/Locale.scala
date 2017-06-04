@@ -35,9 +35,11 @@ sealed trait Locale {
   val FETCH_IMAGE_BY_INDEX: String
   val FETCH_IMAGE_BY_SPECIFIED_INDEX: String
   val FETCH_IMAGE_FROM_BOORU_USING_IQDB_ORG: String
+  val FETCH_IMAGE_FROM_PIXIV_USING_SAUCENAO: String
   val FETCH_WITH_SIMILARITY_50_FS: String
   val FIND_IMAGE_WITH_GOOGLE_FD: String
   val FIND_IMAGE_WITH_IQDB_FD: String
+  val FIND_IMAGE_WITH_SAUCENAO_FD: String
   val GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF: String
   val HANDLING_THE_SESSION_FV_FS: String
   val HERE_ARE_THE_IMAGES_I_FOUND_FS: String
@@ -73,7 +75,7 @@ sealed trait Locale {
   val RESET_CONFIGURATION_FS: String
   val RESTART_PROXY: String
   val RESULTS_FS: String
-  val SEARCH_IMAGES_USING_IMAGES_GOOGLE_COM: String
+  val SEARCH_IMAGE_USING_IMAGES_GOOGLE_COM: String
   val SENDING_THE_MESSAGE_FL_FS: String
   val SEND_MESSAGE_FROM_BOT: String
   val SET_DEFAULT_ARGUMENTS_FOR_USER_FORMAT: String
@@ -167,13 +169,17 @@ object Locale {
     override val FETCH_IMAGE_BY_SPECIFIED_INDEX: String =
       "Fetch image by specified index."
     override val FETCH_IMAGE_FROM_BOORU_USING_IQDB_ORG: String =
-      "Fetch image from \\*booru using iqdb.org"
+      "Fetch image from \\*booru using iqdb.org."
+    override val FETCH_IMAGE_FROM_PIXIV_USING_SAUCENAO: String =
+      "Fetch image from from pixiv.net using saucenao.com."
     override val FETCH_WITH_SIMILARITY_50_FS: String =
       "Fetch first image with similarity >= 50%"
     override val FIND_IMAGE_WITH_GOOGLE_FD: String =
       "find image with google"
     override val FIND_IMAGE_WITH_IQDB_FD: String =
       "find image with iqdb"
+    override val FIND_IMAGE_WITH_SAUCENAO_FD: String =
+      "find image with saucenao"
     override val GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF: String =
       "Get information about quoted user or yourself."
     override val HANDLING_THE_SESSION_FV_FS: String =
@@ -246,7 +252,7 @@ object Locale {
       "Restart proxy."
     override val RESULTS_FS: String =
       "Results"
-    override val SEARCH_IMAGES_USING_IMAGES_GOOGLE_COM: String =
+    override val SEARCH_IMAGE_USING_IMAGES_GOOGLE_COM: String =
       "Search image using images.google.com."
     override val SENDING_THE_MESSAGE_FL_FS: String =
       "sending the message"
@@ -356,13 +362,17 @@ object Locale {
     override val FETCH_IMAGE_BY_SPECIFIED_INDEX: String =
       "Получить картинку по указанному номеру."
     override val FETCH_IMAGE_FROM_BOORU_USING_IQDB_ORG: String =
-      "Получуние картинки с \\*booru используя iqdb.org"
+      "Получуние картинки с \\*booru используя iqdb.org."
+    override val FETCH_IMAGE_FROM_PIXIV_USING_SAUCENAO: String =
+      "Получение картинки с pixiv.net используя saucenao.com."
     override val FETCH_WITH_SIMILARITY_50_FS: String =
       "Получить картинку со сходством >= 50%"
     override val FIND_IMAGE_WITH_GOOGLE_FD: String =
       "найти картинку через google"
     override val FIND_IMAGE_WITH_IQDB_FD: String =
       "найти картинку через iqdb"
+    override val FIND_IMAGE_WITH_SAUCENAO_FD: String =
+      "найти картинку через saucenao"
     override val GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF: String =
       "Получение информации о цитируемом пользователе или о себе."
     override val HANDLING_THE_SESSION_FV_FS: String =
@@ -435,7 +445,7 @@ object Locale {
       "Перезапустить прокси."
     override val RESULTS_FS: String =
       "Результаты"
-    override val SEARCH_IMAGES_USING_IMAGES_GOOGLE_COM: String =
+    override val SEARCH_IMAGE_USING_IMAGES_GOOGLE_COM: String =
       "Поиск картинки через images.google.com."
     override val SENDING_THE_MESSAGE_FL_FS: String =
       "отправке сообщения"

@@ -13,8 +13,9 @@ import scala.concurrent.Future
 object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
-  object ShikigamiBot extends TelegramBot with CustomPolling with Http with ForemanCommand with HelpCommand with
-    ControlCommand with IqdbCommand with RateCommand with GoogleCommand with GuessCommand with IdentityCommand {
+  object ShikigamiBot extends TelegramBot with CustomPolling with Http with ForemanCommand with HelpCommand
+    with ControlCommand with PixivCommand with IqdbCommand with RateCommand with GoogleCommand
+    with GuessCommand with IdentityCommand {
     override def token: String = configuration.string("bot.token").get
 
     override val workspace: Option[Long] = configuration.long("bot.workspace")

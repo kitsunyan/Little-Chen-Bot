@@ -170,7 +170,7 @@ trait GoogleCommand extends Command with ExtractImage {
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan(locale.SEARCH_IMAGES_USING_IMAGES_GOOGLE_COM,
+        replyMan(locale.SEARCH_IMAGE_USING_IMAGES_GOOGLE_COM,
           (List("-i", "--index"), Some("integer"),
             locale.FETCH_IMAGE_BY_INDEX) ::
           (List("-d", "--as-document"), None,
