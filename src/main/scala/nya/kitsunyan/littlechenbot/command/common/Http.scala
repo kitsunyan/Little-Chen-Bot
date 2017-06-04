@@ -39,7 +39,7 @@ trait Http {
     def contentLength(maxContentLength: Long): HttpFilter = {
       (url, privateUrl, execution) => {
         execution.headers("Content-Length")
-          .flatMap(_.headOption)
+          .headOption
           .map(_.toLong)
           .find(_ > maxContentLength)
           .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
