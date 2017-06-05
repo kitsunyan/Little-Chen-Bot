@@ -154,7 +154,8 @@ trait GoogleCommand extends Command with ExtractImage {
           if (nextIndex >= 0) url.substring(0, nextIndex) else url
         }
         http(url, proxy = true).header("Referer", refererUrl)
-          .runBytes(HttpFilters.ok)(response => ImageData(url, Utils.extractNameFromUrl(url), response.body))
+          .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(response =>
+          ImageData(url, Utils.extractNameFromUrl(url), response.body))
       }.getOrElse(throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}."))
     }
 

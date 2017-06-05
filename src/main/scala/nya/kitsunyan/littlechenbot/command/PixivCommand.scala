@@ -98,7 +98,7 @@ trait PixivCommand extends Command with ExtractImage {
 
           Future(http(url)
             .header("Referer", "https://www.pixiv.net")
-            .runBytes(HttpFilters.ok)(_.body))
+            .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(_.body))
             .map(PixivImage(_, url, mimeType))
             .recoverWith { case e =>
             readWithExtension(extensions.tail, Some(e))

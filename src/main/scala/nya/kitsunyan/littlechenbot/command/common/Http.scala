@@ -6,6 +6,7 @@ import okhttp3._
 
 import java.util.concurrent.TimeUnit
 
+import scala.annotation.tailrec
 import scala.language.implicitConversions
 
 trait Http {
@@ -18,32 +19,33 @@ trait Http {
 
   private lazy val proxyClient = proxy.map(client.newBuilder().proxy(_).build).getOrElse(client)
 
-  type HttpFilter = (String, Boolean, HttpExecution) => Unit
+  case class HttpFilter(filterHeaders: (String, Boolean, HttpExecution) => Unit,
+    maxSize: Option[(Int, (String, Boolean) => Nothing)] = None)
 
   class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
     with UserMessageException
 
   object HttpFilters {
-    def any: HttpFilter = (_, _, _) => ()
+    def any: HttpFilter = HttpFilter((_, _, _) => ())
 
     def ok: HttpFilter = code(200)
 
     def code(validCodes: Int*): HttpFilter = {
-      (url, privateUrl, execution) => {
+      HttpFilter((url, privateUrl, execution) => {
         if (!validCodes.contains(execution.code)) {
           throwWithPrivateUrl(url, privateUrl, s"Invalid response: [${execution.code}]")
         }
-      }
+      })
     }
 
-    def contentLength(maxContentLength: Long): HttpFilter = {
-      (url, privateUrl, execution) => {
+    def contentLength(maxContentLength: Int): HttpFilter = {
+      HttpFilter((url, privateUrl, execution) => {
         execution.headers("Content-Length")
           .headOption
           .map(_.toLong)
           .find(_ > maxContentLength)
           .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
-      }
+      }, Some(maxContentLength, (url, privateUrl) => throwWithPrivateUrl(url, privateUrl, s"Response is too large")))
     }
 
     private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
@@ -55,10 +57,19 @@ trait Http {
 
   class ExtendedHttpFilter(filter: HttpFilter) {
     def &&(anotherFilter: HttpFilter): HttpFilter = {
-      (url, privateUrl, execution) => {
-        filter(url, privateUrl, execution)
-        anotherFilter(url, privateUrl, execution)
-      }
+      val maxSize = (for {
+        (size, error) <- filter.maxSize
+        (anotherSize, anotherError) <- anotherFilter.maxSize
+      } yield if (size < anotherSize) {
+        (size, error)
+      } else {
+        (anotherSize, anotherError)
+      }) orElse filter.maxSize orElse anotherFilter.maxSize
+
+      HttpFilter((url, privateUrl, execution) => {
+        filter.filterHeaders(url, privateUrl, execution)
+        anotherFilter.filterHeaders(url, privateUrl, execution)
+      }, maxSize)
     }
   }
 
@@ -128,7 +139,8 @@ trait Http {
       })
     }
 
-    private def run[T, R](filter: HttpFilter, convert: ResponseBody => T, callback: HttpResponse[T] => R): R = {
+    private def run[T, R](filter: HttpFilter, convert: (String, Boolean, ResponseBody) => T,
+      callback: HttpResponse[T] => R): R = {
       val request = {
         if (fields.nonEmpty) {
           val body = if (multipart) {
@@ -145,8 +157,9 @@ trait Http {
       val response = (if (proxy) proxyClient else client).newCall(request).execute()
       val execution = new HttpExecution(response)
       try {
-        filter(request.url().toString, privateUrl, execution)
-        callback(new HttpResponse(convert(response.body), execution))
+        val url = request.url().toString
+        filter.filterHeaders(url, privateUrl, execution)
+        callback(new HttpResponse(convert(url, privateUrl, response.body), execution))
       } catch {
         case e: Exception =>
           response.close()
@@ -155,11 +168,44 @@ trait Http {
     }
 
     def runString[R](filter: HttpFilter)(callback: HttpResponse[String] => R): R = {
-      run(filter, _.string, callback)
+      run(filter, (_, _, body) => body.string, callback)
     }
 
     def runBytes[R](filter: HttpFilter)(callback: HttpResponse[Array[Byte]] => R): R = {
-      run(filter, _.bytes, callback)
+      run(filter, readBytes(filter), callback)
+    }
+
+    private def readBytes(filter: HttpFilter)(url: String, privateUrl: Boolean, body: ResponseBody): Array[Byte] = {
+      import okhttp3.internal.Util
+
+      val source = body.source
+
+      try {
+        filter.maxSize.map { case (size, error) =>
+          val buffer = new okio.Buffer
+
+          @tailrec def readBytes(upTo: Long): Boolean = {
+            if (upTo <= 0) {
+              false
+            } else {
+              val read = source.read(buffer, upTo)
+              if (read >= 0) {
+                readBytes(upTo - read)
+              } else {
+                true
+              }
+            }
+          }
+
+          if (readBytes(size + 1)) {
+            buffer
+          } else {
+            error(url, privateUrl)
+          }
+        }.getOrElse(source).readByteArray()
+      } finally {
+        Util.closeQuietly(source)
+      }
     }
   }
 
