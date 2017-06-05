@@ -6,6 +6,7 @@ import info.mukel.telegrambot4s.api.AkkaImplicits
 
 import okhttp3._
 
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
 import scala.annotation.tailrec
@@ -144,7 +145,8 @@ trait Http {
       })
     }
 
-    private def run[T](filter: HttpFilter, convert: (String, Boolean, ResponseBody) => T): Future[HttpResponse[T]] = {
+    private def run[T](filter: HttpFilter, convert: (String, Boolean, ResponseBody) => T,
+      attemptsLeft: Int): Future[HttpResponse[T]] = {
       Future {
         val request = {
           if (fields.nonEmpty) {
@@ -170,15 +172,30 @@ trait Http {
             response.close()
             throw e
         }
+      }.recoverWith {
+        case e: SocketTimeoutException =>
+          if (attemptsLeft > 0) {
+            Future(Thread.sleep(5000)).flatMap(_ => run(filter, convert, attemptsLeft - 1))
+          } else {
+            throw e
+          }
+      }
+    }
+
+    private def attemptsForRequest: Int = {
+      if (proxy) {
+        3
+      } else {
+        1
       }
     }
 
     def runString[R](filter: HttpFilter): Future[HttpResponse[String]] = {
-      run(filter, (_, _, body) => body.string)
+      run(filter, (_, _, body) => body.string, attemptsForRequest)
     }
 
     def runBytes[R](filter: HttpFilter): Future[HttpResponse[Array[Byte]]] = {
-      run(filter, readBytes(filter))
+      run(filter, readBytes(filter), attemptsForRequest)
     }
 
     private def readBytes(filter: HttpFilter)(url: String, privateUrl: Boolean, body: ResponseBody): Array[Byte] = {
