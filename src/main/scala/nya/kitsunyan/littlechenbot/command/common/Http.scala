@@ -39,7 +39,7 @@ trait Http {
     def code(validCodes: Int*): HttpFilter = {
       HttpFilter((url, privateUrl, execution) => {
         if (!validCodes.contains(execution.code)) {
-          throwWithPrivateUrl(url, privateUrl, s"Invalid response: [${execution.code}]")
+          throwResponseCodeExceptionWithPrivateUrl(url, privateUrl, execution.code)
         }
       })
     }
@@ -53,12 +53,16 @@ trait Http {
           .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
       }, Some(maxContentLength, (url, privateUrl) => throwWithPrivateUrl(url, privateUrl, s"Response is too large")))
     }
+  }
 
-    private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
-      val publicMessage = s"$commonMessage."
-      val privateMessage = s"$commonMessage $url."
-      throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage)
-    }
+  private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
+    val publicMessage = s"$commonMessage."
+    val privateMessage = s"$commonMessage $url."
+    throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage)
+  }
+
+  def throwResponseCodeExceptionWithPrivateUrl(url: String, privateUrl: Boolean, responseCode: Int): Nothing = {
+    throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$responseCode]")
   }
 
   class ExtendedHttpFilter(filter: HttpFilter) {
@@ -123,8 +127,10 @@ trait Http {
       new HttpRequest(builder, proxy, privateUrl, multipart, fields)
     }
 
-    def header(name: String, value: String): HttpRequest = {
-      copy(builder = builder.header(name, value))
+    def header(nameValue: (String, String)): HttpRequest = {
+      nameValue match {
+        case (name, value) => copy(builder = builder.header(name, value))
+      }
     }
 
     def withPrivateUrl(privateUrl: Boolean): HttpRequest = {

@@ -11,6 +11,9 @@ import scala.concurrent.Future
 trait PixivCommand extends Command with ExtractImage {
   this: Http =>
 
+  private val HEADER_REFERER = "Referer" -> "https://www.pixiv.net"
+  private val HEADER_ACCEPT_LANGUAGE = "Accept-Language" -> "en-US,en;q=0.5"
+
   private val commands = List("pixiv")
 
   override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
@@ -20,6 +23,9 @@ trait PixivCommand extends Command with ExtractImage {
   override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
     filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
   }
+
+  class PixivException(override val userMessage: Option[String], message: String)
+    extends Exception(message) with UserMessageException
 
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
@@ -39,21 +45,48 @@ trait PixivCommand extends Command with ExtractImage {
 
     def readPixivResult(pixivId: Long): Future[List[PixivResult]] = {
       val mediumPageUrl = s"https://www.pixiv.net/member_illust.php?mode=medium&illust_id=$pixivId"
-      val mediumResponse = http(mediumPageUrl).runString(HttpFilters.ok).map(_.body)
+      val mediumResponse = http(mediumPageUrl)
+        .header(HEADER_ACCEPT_LANGUAGE)
+        .runString(HttpFilters.code(200, 403, 404))
 
       case class Response(iterator: Iterator[List[String]], pageUrl: String)
 
       val responseFuture = mediumResponse.flatMap { mediumResponse =>
-        val imagePattern = "/img/(\\d+/\\d+/\\d+/\\d+/\\d+/\\d+)/(\\d+)_p(\\d+)(\\w*?)\\.\\w+\"".r
-        val multipleImages = "pixiv.tracking.URL = \".*?\\\\u0026multi=true\";".r.findFirstIn(mediumResponse).nonEmpty
+        if (mediumResponse.code != 200) {
+          val errorMessage = "<p class=\"error-message\">(.*?)</p>".r
+            .findFirstMatchIn(mediumResponse.body)
+            .flatMap(_.subgroups.headOption)
 
-        if (multipleImages) {
-          val mangaPageUrl = s"https://www.pixiv.net/member_illust.php?mode=manga&illust_id=$pixivId"
-          val mangaResponse = http(mangaPageUrl).runString(HttpFilters.ok).map(_.body)
+          val possibleMessages =
+            "Artist has made their work private" ::
+            "Work has been deleted or the ID does not exist" ::
+            Nil
 
-          mangaResponse.map(r => Response(imagePattern.findAllMatchIn(r).map(_.subgroups), mangaPageUrl))
+          errorMessage match {
+            case Some(s) if possibleMessages.exists(s.contains) =>
+              Future.successful(Response(Iterator.empty, mediumPageUrl))
+            case Some(s) =>
+              throw new PixivException(Some("Invalid response from pixiv.net"), s)
+            case _ =>
+              throwResponseCodeExceptionWithPrivateUrl(mediumPageUrl, false, mediumResponse.code)
+          }
         } else {
-          Future.successful(Response(imagePattern.findAllMatchIn(mediumResponse).map(_.subgroups), mediumPageUrl))
+          val imagePattern = "/img/(\\d+/\\d+/\\d+/\\d+/\\d+/\\d+)/(\\d+)_p(\\d+)(\\w*?)\\.\\w+\"".r
+          val multipleImages = "pixiv.tracking.URL = \".*?\\\\u0026multi=true\";".r
+            .findFirstIn(mediumResponse.body).nonEmpty
+
+          def extract(body: String): Iterator[List[String]] = imagePattern.findAllMatchIn(body).map(_.subgroups)
+
+          if (multipleImages) {
+            val mangaPageUrl = s"https://www.pixiv.net/member_illust.php?mode=manga&illust_id=$pixivId"
+            val mangaResponse = http(mangaPageUrl)
+              .header(HEADER_ACCEPT_LANGUAGE)
+              .runString(HttpFilters.ok)
+
+            mangaResponse.map(r => Response(extract(r.body), mangaPageUrl))
+          } else {
+            Future.successful(Response(extract(mediumResponse.body), mediumPageUrl))
+          }
         }
       }
 
@@ -106,7 +139,7 @@ trait PixivCommand extends Command with ExtractImage {
           val url = s"$urlNoExtension$extension"
 
           http(url)
-            .header("Referer", "https://www.pixiv.net")
+            .header(HEADER_REFERER)
             .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
             .map(_.body)
             .map(PixivImage(_, url, mimeType))
