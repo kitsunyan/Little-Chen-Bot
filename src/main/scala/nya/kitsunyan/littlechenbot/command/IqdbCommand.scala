@@ -29,10 +29,10 @@ trait IqdbCommand extends Command with ExtractImage {
     case class IqdbResult(index: Int, url: String, previewUrl: Option[String], blurMode: Utils.BlurMode,
       booruService: BooruService, alias: Option[String], similarity: Int, matches: Boolean)
 
-    def sendIqdbRequest(minSimilarity: Int)(typedFile: TypedFile): List[IqdbResult] = {
+    def sendIqdbRequest(minSimilarity: Int)(typedFile: TypedFile): Future[List[IqdbResult]] = {
       http("https://iqdb.org/")
         .file(typedFile.multipart("file"))
-        .fields(BooruService.list.map("service[]" -> _.iqdbId)).runString(HttpFilters.ok) { response =>
+        .fields(BooruService.list.map("service[]" -> _.iqdbId)).runString(HttpFilters.ok).map { response =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
           "(?:<img src='(.*?)'.*?)?(?:<td>\\d+×\\d+ \\[(\\w+)\\]</td>.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
@@ -109,13 +109,13 @@ trait IqdbCommand extends Command with ExtractImage {
 
     case class PreviewBlank(index: Int, url: Option[String], blurMode: Utils.BlurMode)
 
-    def readBooruPage(iqdbResult: IqdbResult): ImageData = {
+    def readBooruPage(iqdbResult: IqdbResult): Future[ImageData] = {
       val pageUrl = iqdbResult.url
       val pageUrlFunction = () => iqdbResult.alias
         .map(iqdbResult.booruService.replaceDomain(pageUrl, _))
         .getOrElse(pageUrl)
 
-      http(pageUrl, proxy = true).runString(HttpFilters.ok) { response =>
+      http(pageUrl, proxy = true).runString(HttpFilters.ok).map { response =>
         iqdbResult.booruService.parseHtml(response.body) match {
           case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new CommandException(s"${locale.NOT_PARSED_FS}: $pageUrl.")
@@ -123,30 +123,34 @@ trait IqdbCommand extends Command with ExtractImage {
       }
     }
 
-    def readBooruImage(imageData: ImageData): ReadImageData = {
+    def readBooruImage(imageData: ImageData): Future[ReadImageData] = {
       http(imageData.url, proxy = true)
-        .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
-        ReadImageData(Utils.extractNameFromUrl(imageData.url), response.body)(imageData.pageUrlFunction, imageData.tags)
-      }
+        .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+        .map(response => ReadImageData(Utils.extractNameFromUrl(imageData.url),
+          response.body)(imageData.pageUrlFunction, imageData.tags))
     }
 
-    def readBooruImages(messageWithImage: Message, query: Boolean)(iqdbResults: List[IqdbResult]): ReadImageData = {
+    def readBooruImages(messageWithImage: Message, query: Boolean)
+      (iqdbResults: List[IqdbResult]): Future[ReadImageData] = {
       case class Result(successImageData: Option[ReadImageData] = None,
         additionalIqdbResults: List[IqdbResult] = Nil, exception: Option[Exception] = None)
 
-      val result = iqdbResults.foldLeft(Result()) { (result, iqdbResult) =>
+      def handleResult(iqdbResult: IqdbResult)(result: Result): Future[Result] = {
         if (result.successImageData.isEmpty && iqdbResult.matches && !query) {
-          try {
-            result.copy(successImageData = Some(readBooruImage(readBooruPage(iqdbResult))))
-          } catch {
-            case e: Exception => result.copy(exception = result.exception orElse Some(e))
-          }
+          readBooruPage(iqdbResult)
+            .flatMap(readBooruImage)
+            .map(i => result.copy(successImageData = Some(i)))
+            .recover {
+              case e: Exception => result.copy(exception = result.exception orElse Some(e))
+            }
         } else {
-          result.copy(additionalIqdbResults = iqdbResult :: result.additionalIqdbResults)
+          Future.successful(result.copy(additionalIqdbResults = iqdbResult :: result.additionalIqdbResults))
         }
       }
 
-      result.successImageData.getOrElse {
+      iqdbResults
+        .foldLeft(Future.successful(Result()))((r, i) => r.flatMap(handleResult(i)))
+        .map(result => result.successImageData.getOrElse {
         val notFoundMessage = result.exception
           .map(_ => locale.NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS)
           .getOrElse(locale.NO_IMAGES_FOUND_FS)
@@ -179,7 +183,7 @@ trait IqdbCommand extends Command with ExtractImage {
           result.exception.map(handleException(_, Some(messageWithImage)))
           new RecoverException(messageTextFuture.flatMap(replyWithQueryList(messageWithImage, _, previewBlanks)))
         }
-      }
+      })
     }
 
     def collectTags(short: Boolean, tags: List[BooruService.Tag]): Option[String] = {
@@ -231,11 +235,10 @@ trait IqdbCommand extends Command with ExtractImage {
       if (previewBlanks.nonEmpty) {
         previewBlanks.map { previewBlank =>
           previewBlank.url.map { previewUrl =>
-            Future {
-              http(previewUrl).runBytes(HttpFilters.ok) { response =>
-                Utils.Preview(previewBlank.index, Some(response.body), "image/jpeg", previewBlank.blurMode)
-              }
-            }.recover { case e =>
+            http(previewUrl)
+              .runBytes(HttpFilters.ok)
+              .map(r => Utils.Preview(previewBlank.index, Some(r.body), "image/jpeg", previewBlank.blurMode))
+              .recover { case e =>
               handleException(e, Some(messageWithImage))
               Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)
             }
@@ -328,6 +331,10 @@ trait IqdbCommand extends Command with ExtractImage {
 
     def withConfiguration[A, B, C](next: B => A => C, future: Future[B])(value: A): Future[C] = {
       future.map(next).map(_(value))
+    }
+
+    def withConfigurationFuture[A, B, C](next: B => A => Future[C], future: Future[B])(value: A): Future[C] = {
+      future.map(next).flatMap(_(value))
     }
 
     val similarityOption = arguments("s", "min-similarity").asInt
@@ -430,10 +437,10 @@ trait IqdbCommand extends Command with ExtractImage {
         .unitFlatMap(messageWithImageFuture)
         .map(obtainMessageFile(commands.head))
         .scopeFlatMap((messageWithImage, file) => readTelegramFile(file)
-          .flatMap(withConfiguration(sendIqdbRequest, similarity))
+          .flatMap(withConfigurationFuture(sendIqdbRequest, similarity))
           .flatMap(withConfiguration(applyPriority, priority))
           .map(filterByIndex(indexOption))
-          .map(readBooruImages(messageWithImage, query))
+          .flatMap(readBooruImages(messageWithImage, query))
           .flatMap(replyWithImage(!tags))
           .flatMap((replyWithTags(tags) _).tupled))
         .recoverWith[Any](message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))

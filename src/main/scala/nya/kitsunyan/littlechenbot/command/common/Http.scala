@@ -2,14 +2,19 @@ package nya.kitsunyan.littlechenbot.command.common
 
 import nya.kitsunyan.littlechenbot.util.UserMessageException
 
+import info.mukel.telegrambot4s.api.AkkaImplicits
+
 import okhttp3._
 
 import java.util.concurrent.TimeUnit
 
 import scala.annotation.tailrec
+import scala.concurrent.Future
 import scala.language.implicitConversions
 
 trait Http {
+  this: AkkaImplicits =>
+
   val proxy: Option[java.net.Proxy]
 
   private lazy val client = new OkHttpClient.Builder()
@@ -139,40 +144,41 @@ trait Http {
       })
     }
 
-    private def run[T, R](filter: HttpFilter, convert: (String, Boolean, ResponseBody) => T,
-      callback: HttpResponse[T] => R): R = {
-      val request = {
-        if (fields.nonEmpty) {
-          val body = if (multipart) {
-            fields.foldRight(new MultipartBody.Builder().setType(MultipartBody.FORM))(_.multipart(_)).build
+    private def run[T](filter: HttpFilter, convert: (String, Boolean, ResponseBody) => T): Future[HttpResponse[T]] = {
+      Future {
+        val request = {
+          if (fields.nonEmpty) {
+            val body = if (multipart) {
+              fields.foldRight(new MultipartBody.Builder().setType(MultipartBody.FORM))(_.multipart(_)).build
+            } else {
+              fields.foldRight(new FormBody.Builder)(_.form(_)).build
+            }
+            builder.post(body).build
           } else {
-            fields.foldRight(new FormBody.Builder)(_.form(_)).build
+            builder.build
           }
-          builder.post(body).build
-        } else {
-          builder.build
+        }
+
+        val response = (if (proxy) proxyClient else client).newCall(request).execute()
+        val execution = new HttpExecution(response)
+        try {
+          val url = request.url().toString
+          filter.filterHeaders(url, privateUrl, execution)
+          new HttpResponse(convert(url, privateUrl, response.body), execution)
+        } catch {
+          case e: Exception =>
+            response.close()
+            throw e
         }
       }
-
-      val response = (if (proxy) proxyClient else client).newCall(request).execute()
-      val execution = new HttpExecution(response)
-      try {
-        val url = request.url().toString
-        filter.filterHeaders(url, privateUrl, execution)
-        callback(new HttpResponse(convert(url, privateUrl, response.body), execution))
-      } catch {
-        case e: Exception =>
-          response.close()
-          throw e
-      }
     }
 
-    def runString[R](filter: HttpFilter)(callback: HttpResponse[String] => R): R = {
-      run(filter, (_, _, body) => body.string, callback)
+    def runString[R](filter: HttpFilter): Future[HttpResponse[String]] = {
+      run(filter, (_, _, body) => body.string)
     }
 
-    def runBytes[R](filter: HttpFilter)(callback: HttpResponse[Array[Byte]] => R): R = {
-      run(filter, readBytes(filter), callback)
+    def runBytes[R](filter: HttpFilter): Future[HttpResponse[Array[Byte]]] = {
+      run(filter, readBytes(filter))
     }
 
     private def readBytes(filter: HttpFilter)(url: String, privateUrl: Boolean, body: ResponseBody): Array[Byte] = {

@@ -24,51 +24,60 @@ trait PixivCommand extends Command with ExtractImage {
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def sendSaucenaoRequest(typedFile: TypedFile): List[Long] = {
-      val response = http("https://saucenao.com/search.php")
+    def sendSaucenaoRequest(typedFile: TypedFile): Future[List[Long]] = {
+      http("https://saucenao.com/search.php")
         .file(typedFile.multipart("file"))
-        .runString(HttpFilters.ok)(_.body)
-
-      "<strong>Pixiv ID: </strong><a .*?>(\\d+)</a>".r.findAllMatchIn(response)
-        .flatMap(_.subgroups.headOption).map(_.toLong).toList
+        .runString(HttpFilters.ok)
+        .map(response => "<strong>Pixiv ID: </strong><a .*?>(\\d+)</a>".r
+          .findAllMatchIn(response.body)
+          .flatMap(_.subgroups.headOption)
+          .map(_.toLong)
+          .toList)
     }
 
     case class PixivResult(imageUrlNoExtension: String, previewUrlNoExtension: String, pageUrl: String)
 
-    def readPixivResult(pixivId: Long): List[PixivResult] = {
+    def readPixivResult(pixivId: Long): Future[List[PixivResult]] = {
       val mediumPageUrl = s"https://www.pixiv.net/member_illust.php?mode=medium&illust_id=$pixivId"
-      val mediumResponse = http(mediumPageUrl).runString(HttpFilters.ok)(_.body)
+      val mediumResponse = http(mediumPageUrl).runString(HttpFilters.ok).map(_.body)
 
-      val multipleImages = "pixiv.tracking.URL = \".*?\\\\u0026multi=true\";".r.findFirstIn(mediumResponse).nonEmpty
+      case class Response(iterator: Iterator[List[String]], pageUrl: String)
 
-      val imagePattern = "/img/(\\d+/\\d+/\\d+/\\d+/\\d+/\\d+)/(\\d+)_p(\\d+)(\\w*?)\\.\\w+\"".r
+      val responseFuture = mediumResponse.flatMap { mediumResponse =>
+        val imagePattern = "/img/(\\d+/\\d+/\\d+/\\d+/\\d+/\\d+)/(\\d+)_p(\\d+)(\\w*?)\\.\\w+\"".r
+        val multipleImages = "pixiv.tracking.URL = \".*?\\\\u0026multi=true\";".r.findFirstIn(mediumResponse).nonEmpty
 
-      case class Result(part: String, pixivId: Long, index: Int, suffix: String)
+        if (multipleImages) {
+          val mangaPageUrl = s"https://www.pixiv.net/member_illust.php?mode=manga&illust_id=$pixivId"
+          val mangaResponse = http(mangaPageUrl).runString(HttpFilters.ok).map(_.body)
 
-      val (iterator, pageUrl) = if (multipleImages) {
-        val mangaPageUrl = s"https://www.pixiv.net/member_illust.php?mode=manga&illust_id=$pixivId"
-        val mangaResponse = http(mangaPageUrl).runString(HttpFilters.ok)(_.body)
-
-        (imagePattern.findAllMatchIn(mangaResponse), mangaPageUrl)
-      } else {
-        (imagePattern.findAllMatchIn(mediumResponse), mediumPageUrl)
+          mangaResponse.map(r => Response(imagePattern.findAllMatchIn(r).map(_.subgroups), mangaPageUrl))
+        } else {
+          Future.successful(Response(imagePattern.findAllMatchIn(mediumResponse).map(_.subgroups), mediumPageUrl))
+        }
       }
 
-      val results = iterator.map(_.subgroups).map {
-        case part :: id :: index :: suffix :: Nil => Result(part, id.toLong, index.toInt, suffix)
-        case e => throw new MatchError(e)
-      }.filter(_.pixivId == pixivId).toList.distinct
+      responseFuture.map { response =>
+        case class Result(part: String, pixivId: Long, index: Int, suffix: String)
 
-      results.map { result =>
-        PixivResult(s"https://i.pximg.net/img-original/img/${result.part}/${pixivId}_p${result.index}.",
-          s"https://i.pximg.net/c/150x150/img-master/img/${result.part}/${pixivId}_p${result.index}${result.suffix}.",
-          pageUrl)
+        val results = response.iterator.map {
+          case part :: id :: index :: suffix :: Nil => Result(part, id.toLong, index.toInt, suffix)
+          case e => throw new MatchError(e)
+        }.filter(_.pixivId == pixivId).toList.distinct
+
+        results.map { result =>
+          PixivResult(s"https://i.pximg.net/img-original/img/${result.part}/${pixivId}_p${result.index}.",
+            s"https://i.pximg.net/c/150x150/img-master/img/${result.part}/${pixivId}_p${result.index}${result.suffix}.",
+            response.pageUrl)
+        }
       }
     }
 
     def readPixivResults(pixivIds: List[Long]): Future[List[PixivResult]] = {
-      pixivIds.foldLeft[Future[List[PixivResult]]](Future.successful(Nil))((f, id) => f.map(_ ::: readPixivResult(id)))
-        .map {
+      val resultsFuture = pixivIds.foldLeft[Future[List[PixivResult]]](Future.successful(Nil))((f, id) => f
+        .flatMap(results => readPixivResult(id).map(results ::: _)))
+
+      resultsFuture.map {
         case Nil => throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")
         case list => list.take(20)
       }
@@ -96,9 +105,10 @@ trait PixivCommand extends Command with ExtractImage {
           val (extension, mimeType) = extensions.head
           val url = s"$urlNoExtension$extension"
 
-          Future(http(url)
+          http(url)
             .header("Referer", "https://www.pixiv.net")
-            .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(_.body))
+            .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+            .map(_.body)
             .map(PixivImage(_, url, mimeType))
             .recoverWith { case e =>
             readWithExtension(extensions.tail, Some(e))
@@ -207,7 +217,7 @@ trait PixivCommand extends Command with ExtractImage {
         checkArguments(arguments)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)
-            .map(sendSaucenaoRequest)
+            .flatMap(sendSaucenaoRequest)
             .flatMap(readPixivResults)
             .flatMap(storeResponseToWorkspace)
             .flatMap((replyWithPreview _).tupled))

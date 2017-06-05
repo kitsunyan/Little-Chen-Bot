@@ -38,20 +38,21 @@ trait RateCommand extends Command with ExtractImage {
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def obtainEverypixelToken: String = {
+    def obtainEverypixelToken: Future[String] = {
       val url = "https://everypixel.com/aesthetics"
-      val response = http(url).runString(HttpFilters.ok)(_.body)
 
-      "<input .*?id=\"access_token\".*?value=\"(.*?)\".*?/>".r
-        .findFirstMatchIn(response)
-        .flatMap(_.subgroups.headOption)
-        .getOrElse(throw new CommandException(s"${locale.NOT_PARSED_FS}: $url."))
+      http(url)
+        .runString(HttpFilters.ok)
+        .map(response => "<input .*?id=\"access_token\".*?value=\"(.*?)\".*?/>".r
+          .findFirstMatchIn(response.body)
+          .flatMap(_.subgroups.headOption)
+          .getOrElse(throw new CommandException(s"${locale.NOT_PARSED_FS}: $url.")))
     }
 
-    def obtainEverypixelTags(typedFile: TypedFile, token: String): List[String] = {
+    def obtainEverypixelTags(typedFile: TypedFile, token: String): Future[List[String]] = {
       http("https://keywording.api.everypixel.com/v1/keywords")
         .header("Authorization", s"Bearer $token")
-        .file(typedFile.multipart("data")).runString(HttpFilters.ok) { response =>
+        .file(typedFile.multipart("data")).runString(HttpFilters.ok).map { response =>
         import org.json4s._
         import org.json4s.jackson.JsonMethods._
 
@@ -69,8 +70,8 @@ trait RateCommand extends Command with ExtractImage {
     case class EverypixelData(quality: Float, tags: List[String])
 
     def sendEverypixelRequest(typedFile: TypedFile, token: String): Future[EverypixelData] = {
-      val qualityFuture = Future(obtainEverypixelQuality(typedFile, token))
-      val tagsFuture = Future(obtainEverypixelTags(typedFile, token))
+      val qualityFuture = obtainEverypixelQuality(typedFile, token)
+      val tagsFuture = obtainEverypixelTags(typedFile, token)
 
       for {
         quality <- qualityFuture
@@ -78,10 +79,10 @@ trait RateCommand extends Command with ExtractImage {
       } yield EverypixelData(quality, tags)
     }
 
-    def obtainEverypixelQuality(typedFile: TypedFile, token: String): Float = {
+    def obtainEverypixelQuality(typedFile: TypedFile, token: String): Future[Float] = {
       http("https://quality.api.everypixel.com/v1/quality")
         .header("Authorization", s"Bearer $token")
-        .file(typedFile.multipart("data")).runString(HttpFilters.ok) { response =>
+        .file(typedFile.multipart("data")).runString(HttpFilters.ok).map { response =>
         import org.json4s._
         import org.json4s.jackson.JsonMethods._
 
@@ -123,7 +124,7 @@ trait RateCommand extends Command with ExtractImage {
       checkArguments(arguments)
         .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
-          .zip(Future(obtainEverypixelToken))
+          .zip(obtainEverypixelToken)
           .flatMap((sendEverypixelRequest _).tupled)
           .flatMap(replyWithRating))
         .recoverWith[Any](message)(handleError(Some(locale.RATING_REQUEST_FV_FS)))

@@ -63,7 +63,7 @@ trait ControlCommand extends Command {
     } else if (softFiltered && arguments("check-proxy").nonEmpty) {
       checkArguments(arguments, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
-          Future(http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)(identity))
+          http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)
             .flatMap(_ => replyQuote(locale.IT_WORKS)).recoverWith {
             case e: Exception => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}")
           }

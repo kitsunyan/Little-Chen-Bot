@@ -24,10 +24,12 @@ trait GoogleCommand extends Command with ExtractImage {
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def sendGoogleRequest(typedFile: TypedFile): String = {
+    def sendGoogleRequest(typedFile: TypedFile): Future[String] = {
       http("https://images.google.com/searchbyimage/upload")
         .file(typedFile.multipart("encoded_image"))
-        .field("hl" -> "en").runString(HttpFilters.ok)(_.body)
+        .field("hl" -> "en")
+        .runString(HttpFilters.ok)
+        .map(_.body)
     }
 
     case class Image(url: String, previewUrl: String, width: Option[Int], height: Option[Int])
@@ -94,11 +96,9 @@ trait GoogleCommand extends Command with ExtractImage {
       }
 
       indexedImages.map { indexedImage =>
-        Future {
-          http(indexedImage.image.previewUrl).runBytes(HttpFilters.ok) { response =>
-            val mimeType = response.headers("Content-Type").headOption.getOrElse("image/jpeg")
-            Utils.Preview(indexedImage.index, Some(response.body), mimeType, Utils.BlurMode.No)
-          }
+        http(indexedImage.image.previewUrl).runBytes(HttpFilters.ok).map { response =>
+          val mimeType = response.headers("Content-Type").headOption.getOrElse("image/jpeg")
+          Utils.Preview(indexedImage.index, Some(response.body), mimeType, Utils.BlurMode.No)
         }.recover { case e =>
           handleException(e, None)
           Utils.Preview(indexedImage.index, None, "", Utils.BlurMode.No)
@@ -146,7 +146,7 @@ trait GoogleCommand extends Command with ExtractImage {
 
     case class ImageData(url: String, name: String, image: Array[Byte])
 
-    def fetchImageByIndex(index: Int)(list: List[String]): ImageData = {
+    def fetchImageByIndex(index: Int)(list: List[String]): Future[ImageData] = {
       list.lift(index - 1).map { url =>
         val refererUrl = {
           val index = url.indexOf("//")
@@ -154,9 +154,9 @@ trait GoogleCommand extends Command with ExtractImage {
           if (nextIndex >= 0) url.substring(0, nextIndex) else url
         }
         http(url, proxy = true).header("Referer", refererUrl)
-          .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(response =>
-          ImageData(url, Utils.extractNameFromUrl(url), response.body))
-      }.getOrElse(throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}."))
+          .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+          .map(r => ImageData(url, Utils.extractNameFromUrl(url), r.body))
+      }.getOrElse(Future.failed(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")))
     }
 
     def replyWithImage(asDocument: Boolean)(imageData: ImageData): Future[Message] = {
@@ -187,14 +187,14 @@ trait GoogleCommand extends Command with ExtractImage {
       indexOption.map { index =>
         checkArguments(arguments, "i", "index", "d", "as-document")
           .unitFlatMap(extractUrlsListFromWorkspace)
-          .map(fetchImageByIndex(index))
+          .flatMap(fetchImageByIndex(index))
           .flatMap(replyWithImage(asDocument))
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       } getOrElse {
         checkArguments(arguments)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)
-            .map(sendGoogleRequest)
+            .flatMap(sendGoogleRequest)
             .map(parseImages)
             .flatMap(storeResponseToWorkspace)
             .flatMap((replyWithPreview _).tupled))

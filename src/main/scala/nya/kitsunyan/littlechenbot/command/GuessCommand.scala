@@ -116,19 +116,20 @@ trait GuessCommand extends Command {
       }
     }
 
-    def readBooruImage(url: String): Option[(String, Array[Byte])] = {
-      try {
-        http(url, proxy = true)
-          .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
-          val name = {
-            val start = url.lastIndexOf('/') + 1
-            val end = url.indexOf('?', start)
-            if (end >= start) url.substring(start, end) else url.substring(start)
-          }
+    case class BooruImage(name: String, data: Array[Byte])
 
-          Some(name, response.body)
+    def readBooruImage(url: String): Future[Option[BooruImage]] = {
+      http(url, proxy = true)
+        .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+        .map { response =>
+        val name = {
+          val start = url.lastIndexOf('/') + 1
+          val end = url.indexOf('?', start)
+          if (end >= start) url.substring(start, end) else url.substring(start)
         }
-      } catch {
+
+        Some(BooruImage(name, response.body))
+      }.recover {
         case e: Exception =>
           handleException(e, Some(message))
           None
@@ -136,12 +137,12 @@ trait GuessCommand extends Command {
     }
 
     def replySuccessWithImage(game: Game): Future[Option[Nothing]] = {
-      Future(readBooruImage(game.url)).flatMap { imageData =>
+      readBooruImage(game.url).flatMap { booruImageOption =>
         val characters = game.characters.reduce(_ + ", " + _)
         val text = s"${locale.A_WINNER_IS_YOU}\n\n${game.pageUrl}\n\n${locale.CHARACTERS_FS}: $characters"
 
-        imageData.map { case (name, image) =>
-          request(SendPhoto(Left(message.source), Left(InputFile(name, image)),
+        booruImageOption.map { booruImage =>
+          request(SendPhoto(Left(message.source), Left(InputFile(booruImage.name, booruImage.data)),
             replyToMessageId = Some(message.messageId), caption = Some(text)))
         }.getOrElse {
           replyQuote(text)
@@ -185,7 +186,7 @@ trait GuessCommand extends Command {
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
     implicit val localeImplicit = locale
 
-    def queryImages(tags: List[String]): List[String] = {
+    def queryImages(tags: List[String]): Future[List[String]] = {
       val fullTags = ("-rating:explicit" ::
         "-rating:questionable" ::
         "-alternat*" ::
@@ -196,20 +197,29 @@ trait GuessCommand extends Command {
       val url = "http://gelbooru.com/index.php?page=post&s=list&tags=" +
         java.net.URLEncoder.encode(fullTags.reduce(_ + " " + _), "UTF-8")
 
-      http(url, proxy = true).runString(HttpFilters.ok) { response =>
+      http(url, proxy = true).runString(HttpFilters.ok).flatMap { response =>
         val maxPage = "<a href=\".*?pid=(\\d+)\">\\d+</a>".r
           .findAllIn(response.body).matchData.map(_.subgroups)
           .map(_.head.toInt).fold(0)(math.max)
         val page = Random.nextInt(maxPage + 1)
 
-        val pageUrls = if (page > 0) {
-          val newBody = http(s"$url&pid=$page", proxy = true).runString(HttpFilters.ok)(_.body)
-          BooruService.Gelbooru.parseListHtml(newBody)
+        val pageUrlsFuture = if (page > 0) {
+          http(s"$url&pid=$page", proxy = true)
+            .runString(HttpFilters.ok)
+            .map(_.body)
+            .map(BooruService.Gelbooru.parseListHtml)
         } else {
-          Nil
+          Future.successful(Nil)
         }
 
-        val urls = if (pageUrls.nonEmpty) pageUrls else BooruService.Gelbooru.parseListHtml(response.body)
+        pageUrlsFuture.map { pageUrls =>
+          if (pageUrls.nonEmpty) {
+            pageUrls
+          } else {
+            BooruService.Gelbooru.parseListHtml(response.body)
+          }
+        }
+      }.map { urls =>
         if (urls.nonEmpty) {
           urls
         } else {
@@ -218,46 +228,48 @@ trait GuessCommand extends Command {
       }
     }
 
-    def readRandomImage(tags: List[String])(urls: List[String]): (String, String, List[BooruService.Tag]) = {
-      case class Result(success: Option[(String, String, List[BooruService.Tag])] = None,
-        exception: Option[Exception] = None)
+    case class Image(url: String, pageUrl: String, tags: List[BooruService.Tag])
+
+    def readRandomImage(tags: List[String])(urls: List[String]): Future[Image] = {
+      case class Result(success: Option[Image] = None, exception: Option[Exception] = None)
 
       val exclude = "solo" :: "1girl" :: "1boy" :: tags
 
-      val result = Random.shuffle(urls).foldLeft(Result()) { (result, pageUrl) =>
+      def handleResult(pageUrl: String)(result: Result): Future[Result] = {
         if (result.success.isEmpty) {
-          http(pageUrl, proxy = true).runString(HttpFilters.ok) { response =>
-            try {
+          http(pageUrl, proxy = true)
+            .runString(HttpFilters.ok)
+            .map { response =>
               val data = BooruService.Gelbooru.parseHtml(response.body).flatMap { case (url, tags) =>
                 val workTags = tags.filter(t => !exclude.contains(t.title))
                 if (workTags.exists(_.character) && workTags.exists(_.other)) {
-                  Some(url, pageUrl, workTags)
+                  Some(Image(url, pageUrl, workTags))
                 } else {
                   None
                 }
               }
               result.copy(success = data)
-            } catch {
-              case e: Exception => result.copy(exception = result.exception orElse Some(e))
-            }
+            }.recover {
+            case e: Exception => result.copy(exception = result.exception orElse Some(e))
           }
         } else {
-          result
+          Future.successful(result)
         }
       }
 
-      result.success.getOrElse {
-        throw result.exception.getOrElse(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}."))
-      }
+      Random.shuffle(urls)
+        .foldLeft(Future.successful(Result()))((r, u) => r.flatMap(handleResult(u)))
+        .map(r => r.success.getOrElse(throw r.exception
+          .getOrElse(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}."))))
     }
 
-    def createSession(url: String, pageUrl: String, tags: List[BooruService.Tag]): Future[Message] = {
+    def createSession(image: Image): Future[Message] = {
       val startCount = 10
-      val shuffledTags = Random.shuffle(tags.filter(_.other).map(_.title))
+      val shuffledTags = Random.shuffle(image.tags.filter(_.other).map(_.title))
       val knownTags = shuffledTags.take(startCount)
       val hiddenTags = shuffledTags.drop(startCount)
 
-      val game = Game(tags.filter(_.character).map(_.title), knownTags, hiddenTags, url, pageUrl)
+      val game = Game(image.tags.filter(_.character).map(_.title), knownTags, hiddenTags, image.url, image.pageUrl)
       replyQuote(s"${locale.TAGS_FS}:\n\n" + game.knownTags.reduce(_ + "\n" + _))
         .flatMap(m => (actor ? CreateGame(m.messageId, game, locale)).map(_ => m))
     }
@@ -277,9 +289,9 @@ trait GuessCommand extends Command {
         .getOrElse(Nil)
 
       checkArguments(arguments, "t", "tags")
-        .unitMap(queryImages(tags))
-        .map(readRandomImage(tags))
-        .flatMap((createSession _).tupled)
+        .unitFlatMap(queryImages(tags))
+        .flatMap(readRandomImage(tags))
+        .flatMap(createSession)
         .recoverWith(handleError(Some(locale.CREATING_A_SESSION_FV_FS))(message))
     }
   }

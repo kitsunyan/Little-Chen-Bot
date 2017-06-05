@@ -49,9 +49,9 @@ trait ExtractImage {
   }
 
   private def readExternalFile(file: String, readMeta: Boolean)
-    (implicit locale: Locale): Either[TypedFile, String] = {
+    (implicit locale: Locale): Future[Either[TypedFile, String]] = {
     http(file, proxy = true)
-      .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)) { response =>
+      .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)).map { response =>
       val contentType = response.headers("Content-Type").headOption.map { contentType =>
         val index = contentType.indexOf(';')
         if (index >= 0) contentType.substring(0, index) else contentType
@@ -76,23 +76,30 @@ trait ExtractImage {
 
   def readTelegramFile(file: String)(implicit locale: Locale): Future[TypedFile] = {
     if (file.startsWith("http://") || file.startsWith("https://")) {
-      Future(readExternalFile(file, true)).map {
-        case Left(typedFile) => typedFile
-        case Right(url) => readExternalFile(url, false).left.getOrElse(throw new Exception("Impossible value."))
+      readExternalFile(file, true).flatMap {
+        case Left(typedFile) => Future.successful(typedFile)
+        case Right(url) => readExternalFile(url, false).map(_.left.getOrElse(throw new Exception("Impossible value.")))
       }
     } else {
-      request(GetFile(file)).map { file =>
+      request(GetFile(file)).flatMap { file =>
         file.filePath match {
           case Some(path) =>
-            val data = {
-              val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
-              val data = http(telegramImageUrl).withPrivateUrl(true)
-                .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))(_.body)
-              (if (path.endsWith(".webp")) Utils.webpToPng(data) else None).getOrElse(data)
+            val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
+
+            http(telegramImageUrl).withPrivateUrl(true)
+              .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)).map { response =>
+              val data = (if (path.endsWith(".webp")) Utils.webpToPng(response.body) else None)
+                .getOrElse(response.body)
+
+              val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
+                "image/jpeg"
+              } else {
+                "image/png"
+              }
+
+              TypedFile(data, mimeType)
             }
-            val mimeType = if (path.endsWith(".jpg") || path.endsWith(".jpeg")) "image/jpeg" else "image/png"
-            TypedFile(data, mimeType)
-          case None => throw new CommandException(locale.UNABLE_TO_FETCH_TELEGRAM_FILE)
+          case None => Future.failed(new CommandException(locale.UNABLE_TO_FETCH_TELEGRAM_FILE))
         }
       }
     }
