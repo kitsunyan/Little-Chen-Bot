@@ -133,16 +133,14 @@ trait IqdbCommand extends Command with ExtractImage {
     def readBooruImages(messageWithImage: Message, query: Boolean)
       (iqdbResults: List[IqdbResult]): Future[ReadImageData] = {
       case class Result(successImageData: Option[ReadImageData] = None,
-        additionalIqdbResults: List[IqdbResult] = Nil, exception: Option[Exception] = None)
+        additionalIqdbResults: List[IqdbResult] = Nil, exception: Option[Throwable] = None)
 
       def handleResult(iqdbResult: IqdbResult)(result: Result): Future[Result] = {
         if (result.successImageData.isEmpty && iqdbResult.matches && !query) {
           readBooruPage(iqdbResult)
             .flatMap(readBooruImage)
             .map(i => result.copy(successImageData = Some(i)))
-            .recover {
-              case e: Exception => result.copy(exception = result.exception orElse Some(e))
-            }
+            .recover((e: Throwable) => result.copy(exception = result.exception orElse Some(e)))
         } else {
           Future.successful(result.copy(additionalIqdbResults = iqdbResult :: result.additionalIqdbResults))
         }
@@ -180,7 +178,7 @@ trait IqdbCommand extends Command with ExtractImage {
         }
 
         throw (if (additionalResults.isEmpty) result.exception else None).getOrElse {
-          result.exception.map(handleException(_, Some(messageWithImage)))
+          result.exception.map(handleException(Some(messageWithImage)))
           new RecoverException(messageTextFuture.flatMap(replyWithQueryList(messageWithImage, _, previewBlanks)))
         }
       })
@@ -238,10 +236,8 @@ trait IqdbCommand extends Command with ExtractImage {
             http(previewUrl)
               .runBytes(HttpFilters.ok)
               .map(r => Utils.Preview(previewBlank.index, Some(r.body), "image/jpeg", previewBlank.blurMode))
-              .recover { case e =>
-              handleException(e, Some(messageWithImage))
-              Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)
-            }
+              .recover((handleException(Some(messageWithImage))(_)) ->
+                Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No))
           }.getOrElse(Future.successful(Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No)))
         }.foldRight[Future[List[Utils.Preview]]](Future.successful(Nil)) { (future, result) =>
           result.flatMap(list => future.map(_ :: list))
@@ -262,11 +258,7 @@ trait IqdbCommand extends Command with ExtractImage {
         request(ForwardMessage(Left(workspace), Left(messageWithImage.chat.id), None, messageWithImage.messageId))
           .map(_.messageId)
           .map(WorkspaceRequest(commands.head) _ andThen Some.apply)
-          .recover {
-          case e: Throwable =>
-            handleException(e, Some(message))
-            None
-        }
+          .recover((handleException(Some(message))(_)) -> None)
       }.getOrElse(Future.successful(None))
     }
 
@@ -279,11 +271,7 @@ trait IqdbCommand extends Command with ExtractImage {
               .map { messageId =>
               request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
                 .map(_.replyToMessage)
-                .recover {
-                case e: Throwable =>
-                  handleException(e, Some(message))
-                  None
-              }
+                .recover((handleException(Some(message))(_)) -> None)
             }.getOrElse(Future.successful(None))
           } else {
             Future.successful(None)

@@ -63,10 +63,10 @@ trait ControlCommand extends Command {
     } else if (softFiltered && arguments("check-proxy").nonEmpty) {
       checkArguments(arguments, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
-          http("https://gelbooru.com", proxy = true).runString(HttpFilters.ok)
-            .flatMap(_ => replyQuote(locale.IT_WORKS)).recoverWith {
-            case e: Exception => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}")
-          }
+          http("https://gelbooru.com", proxy = true)
+            .runString(HttpFilters.ok)
+            .flatMap(_ => replyQuote(locale.IT_WORKS))
+            .recoverWith((e: Throwable) => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}"))
         } else {
           replyQuote(locale.PROXY_IS_NOT_PRESENT)
         }
@@ -75,9 +75,10 @@ trait ControlCommand extends Command {
       checkArguments(arguments, "restart-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           restartProxyCommand.map { restartProxyCommand =>
-            Future(Utils.exec(None, restartProxyCommand)).flatMap(_ => replyQuote(locale.READY)).recoverWith {
-              case e: Exception => replyQuote(s"${locale.SOMETHING_WENT_WRONG}\n${userMessageForException(e)}")
-            }
+            Future(Utils.exec(None, restartProxyCommand))
+              .flatMap(_ => replyQuote(locale.READY))
+              .recoverWith((e: Throwable) =>
+                replyQuote(s"${locale.SOMETHING_WENT_WRONG}\n${userMessageForException(e)}"))
           }.getOrElse(replyQuote(locale.I_DONT_KNOW_HOW))
         } else {
           replyQuote(locale.PROXY_IS_NOT_PRESENT)

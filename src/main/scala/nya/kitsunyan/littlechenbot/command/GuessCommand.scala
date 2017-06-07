@@ -129,11 +129,7 @@ trait GuessCommand extends Command {
         }
 
         Some(BooruImage(name, response.body))
-      }.recover {
-        case e: Exception =>
-          handleException(e, Some(message))
-          None
-      }
+      }.recover((handleException(Some(message))(_)) -> None)
     }
 
     def replySuccessWithImage(game: Game): Future[Option[Nothing]] = {
@@ -177,10 +173,11 @@ trait GuessCommand extends Command {
       case e: Exception => handleErrorCommon(e, message, Some(locale.HANDLING_THE_SESSION_FV_FS)).map(_ => game)
     }
 
-    game.map { game =>
-      Future(parseMessage(game)).flatMap(replyOptional(game))
-        .recoverWith(handleErrorInternal)
-    }.getOrElse(Future.successful(None))
+    game.map(game =>
+      Future(parseMessage(game))
+        .flatMap(replyOptional(game))
+        .recoverWith(handleErrorInternal))
+      .getOrElse(Future.successful(None))
   }
 
   private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
@@ -231,7 +228,7 @@ trait GuessCommand extends Command {
     case class Image(url: String, pageUrl: String, tags: List[BooruService.Tag])
 
     def readRandomImage(tags: List[String])(urls: List[String]): Future[Image] = {
-      case class Result(success: Option[Image] = None, exception: Option[Exception] = None)
+      case class Result(success: Option[Image] = None, exception: Option[Throwable] = None)
 
       val exclude = "solo" :: "1girl" :: "1boy" :: tags
 
@@ -249,9 +246,7 @@ trait GuessCommand extends Command {
                 }
               }
               result.copy(success = data)
-            }.recover {
-            case e: Exception => result.copy(exception = result.exception orElse Some(e))
-          }
+            }.recover((e: Throwable) => result.copy(exception = result.exception orElse Some(e)))
         } else {
           Future.successful(result)
         }

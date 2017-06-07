@@ -67,7 +67,7 @@ object BotApplication extends App {
       }
     }
 
-    override def handleException(e: Throwable, causalMessage: Option[Message]): Unit = {
+    override def handleException(causalMessage: Option[Message])(e: Throwable): Unit = {
       e.printStackTrace()
       causalMessage.foreach { causalMessage =>
         botOwner.map { botOwner =>

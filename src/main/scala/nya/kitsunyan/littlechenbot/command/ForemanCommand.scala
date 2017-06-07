@@ -61,10 +61,9 @@ trait ForemanCommand extends Command {
         .map(c => (actor ? CheckCommand(CommandKey(message.chat.id, c))).mapTo[Boolean])
         .map(_.map { shouldReply =>
         if (shouldReply) {
-          request(SendPhoto(Left(message.source), Right(foremanImage), replyToMessageId = Some(message.messageId)))
-            .recover {
-            case e => handleException(e, Some(message))
-          }
+          request(SendPhoto(Left(message.source), Right(foremanImage),
+            replyToMessageId = Some(message.messageId)))
+            .recover(handleException(Some(message))(_))
         } else {
           Future.unit
         }

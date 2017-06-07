@@ -143,9 +143,7 @@ trait PixivCommand extends Command with ExtractImage {
             .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
             .map(_.body)
             .map(PixivImage(_, url, mimeType))
-            .recoverWith { case e =>
-            readWithExtension(extensions.tail, Some(e))
-          }
+            .recoverWith((e: Throwable) => readWithExtension(extensions.tail, Some(e)))
         } else {
           Future.failed(exception.getOrElse(new Exception("No extensions provided")))
         }
@@ -169,10 +167,7 @@ trait PixivCommand extends Command with ExtractImage {
       indexedImages.map { indexedImage =>
         readPixivImage(indexedImage.pixivResult.previewUrlNoExtension)
           .map(i => Utils.Preview(indexedImage.index, Some(i.image), i.mimeType, Utils.BlurMode.No))
-          .recover { case e =>
-          handleException(e, None)
-          Utils.Preview(indexedImage.index, None, "", Utils.BlurMode.No)
-        }
+          .recover((handleException(None)(_)) -> Utils.Preview(indexedImage.index, None, "", Utils.BlurMode.No))
       }.foldRight[Future[List[Utils.Preview]]](Future.successful(Nil)) { (future, result) =>
         result.flatMap(list => future.map(_ :: list))
       }.flatMap { list =>

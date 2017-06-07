@@ -25,7 +25,7 @@ trait Command extends BotBase with AkkaDefaults {
 
   def prependDescription(list: List[Description], locale: Locale): List[Description] = list
 
-  def handleException(e: Throwable, causalMessage: Option[Message]): Unit
+  def handleException(causalMessage: Option[Message])(e: Throwable): Unit
 
   def handleError(during: Option[String])(causalMessage: Message)(implicit message: Message, locale: Locale):
     PartialFunction[Throwable, Future[Any]] = {
@@ -39,14 +39,14 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleErrorCommon(e: Exception, causalMessage: Message, during: Option[String])
     (implicit message: Message, locale: Locale): Future[Any] = {
-    handleException(e, Some(causalMessage))
+    handleException(Some(causalMessage))(e)
     val anExceptionWasThrown = during
       .map(locale.AN_EXCEPTION_WAS_THROWN_FORMAT.format(_))
       .getOrElse(locale.AN_EXCEPTION_WAS_THROWN)
     replyQuote(s"$anExceptionWasThrown\n${userMessageForException(e)}")
   }
 
-  def userMessageForException(e: Exception): String = {
+  def userMessageForException(e: Throwable): String = {
     e match {
       case e: UserMessageException =>
         e.userMessage.getOrElse(e.getCause.getClass.getName)
@@ -106,9 +106,8 @@ trait Command extends BotBase with AkkaDefaults {
   class CommandException(message: String, val parseMode: Option[ParseMode.ParseMode] = None) extends Exception(message)
 
   final override def onMessage(message: Message): Unit = {
-    handleMessage(filterChat(message))(message).recover {
-      case e => handleException(e, Some(message))
-    }
+    handleMessage(filterChat(message))(message)
+      .recover(handleException(Some(message))(_))
   }
 
   def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
@@ -204,6 +203,19 @@ trait Command extends BotBase with AkkaDefaults {
             Some(ParseMode.Markdown))
         }
       }
+    }
+  }
+
+  implicit def anyThrowable[T](function: Throwable => T): PartialFunction[Throwable, T] = {
+    case e => function(e)
+  }
+
+  implicit def anyThrowableWithFallback[T](functionAndFallback: (Throwable => Unit, T)):
+  PartialFunction[Throwable, T] = {
+    case e => functionAndFallback match {
+      case (function, result) =>
+        function(e)
+        result
     }
   }
 

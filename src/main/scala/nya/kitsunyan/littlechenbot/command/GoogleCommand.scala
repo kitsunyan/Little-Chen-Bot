@@ -99,10 +99,7 @@ trait GoogleCommand extends Command with ExtractImage {
         http(indexedImage.image.previewUrl).runBytes(HttpFilters.ok).map { response =>
           val mimeType = response.headers("Content-Type").headOption.getOrElse("image/jpeg")
           Utils.Preview(indexedImage.index, Some(response.body), mimeType, Utils.BlurMode.No)
-        }.recover { case e =>
-          handleException(e, None)
-          Utils.Preview(indexedImage.index, None, "", Utils.BlurMode.No)
-        }
+        }.recover((handleException(None)(_)) -> Utils.Preview(indexedImage.index, None, "", Utils.BlurMode.No))
       }.foldRight[Future[List[Utils.Preview]]](Future.successful(Nil)) { (future, result) =>
         result.flatMap(list => future.map(_ :: list))
       }.flatMap { list =>
