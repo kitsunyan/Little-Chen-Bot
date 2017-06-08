@@ -129,6 +129,17 @@ trait Command extends BotBase with AkkaDefaults {
       .filter(_.nonEmpty)
       .map(t => handleMessage(ExtendedMessage(message, firstCommand, t), filterChat(message))
         .recover((handleException(Some(message))(_)) -> Status.Cancel)).getOrElse(Future.successful(Status.Cancel))
+      .flatMap {
+      case Status.SuccessMatch(arguments) => arguments.nextCommand match {
+        case Some((Arguments.NextMode.OnSuccess, commandText)) => onMessageExtend(message, false, Some(commandText))
+        case _ => Future.successful(Status.Cancel)
+      }
+      case Status.FailMatch(arguments) => arguments.nextCommand match {
+        case Some((Arguments.NextMode.OnFail, commandText)) => onMessageExtend(message, false, Some(commandText))
+        case _ => Future.successful(Status.Cancel)
+      }
+      case Status.Cancel => Future.successful(Status.Cancel)
+    }
   }
 
   def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {

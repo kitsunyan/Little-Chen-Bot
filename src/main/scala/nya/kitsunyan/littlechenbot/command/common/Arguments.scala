@@ -3,32 +3,48 @@ package nya.kitsunyan.littlechenbot.command.common
 import scala.annotation.tailrec
 
 class Arguments(data: String) {
+  import Arguments._
+
   @tailrec private def splitSpaces(index: Int, quote: Boolean, escape: Boolean,
-    chars: List[Char], arguments: List[String]): List[String] = {
+    chars: List[Char], arguments: List[String], lastAmpersand: Boolean, lastVerticalBar: Boolean):
+    (List[String], NextMode, Option[String]) = {
+    def appendArguments: List[String] = if (chars.nonEmpty) chars.reverse.mkString :: arguments else arguments
+
     if (index < data.length) {
       val c = data(index)
       if (c <= ' ' && !quote && !escape) {
-        splitSpaces(index + 1, quote, escape, Nil,
-          if (chars.nonEmpty) chars.reverse.mkString :: arguments else arguments)
+        splitSpaces(index + 1, quote, escape, Nil, appendArguments, false, false)
       } else {
         if (escape) {
           if (c == 'n') {
-            splitSpaces(index + 1, quote, false, '\n' :: chars, arguments)
+            splitSpaces(index + 1, quote, false, '\n' :: chars, arguments, false, false)
           } else {
-            splitSpaces(index + 1, quote, false, chars, arguments)
+            splitSpaces(index + 1, quote, false, chars, arguments, false, false)
           }
         } else {
           if (c == '\\') {
-            splitSpaces(index + 1, quote, true, chars, arguments)
+            splitSpaces(index + 1, quote, true, chars, arguments, false, false)
           } else if (c == '"') {
-            splitSpaces(index + 1, !quote, escape, chars, arguments)
+            splitSpaces(index + 1, !quote, escape, chars, arguments, false, false)
+          } else if (c == '&' && !quote) {
+            if (lastAmpersand) {
+              (appendArguments.reverse, NextMode.OnSuccess, Some(data.substring(index + 1).trim).filter(_.nonEmpty))
+            } else {
+              splitSpaces(index + 1, quote, escape, chars, arguments, true, false)
+            }
+          } else if (c == '|' && !quote) {
+            if (lastVerticalBar) {
+              (appendArguments.reverse, NextMode.OnFail, Some(data.substring(index + 1).trim).filter(_.nonEmpty))
+            } else {
+              splitSpaces(index + 1, quote, escape, chars, arguments, false, true)
+            }
           } else {
-            splitSpaces(index + 1, quote, escape, c :: chars, arguments)
+            splitSpaces(index + 1, quote, escape, c :: chars, arguments, false, false)
           }
         }
       }
     } else {
-      (if (chars.nonEmpty) chars.reverse.mkString :: arguments else arguments).reverse
+      (appendArguments.reverse, NextMode.None, None)
     }
   }
 
@@ -57,7 +73,10 @@ class Arguments(data: String) {
     }
   }
 
-  private val arguments = mapArguments(splitSpaces(0, false, false, Nil, Nil), None, Map())
+  private val (arguments, nextCommandOption) = {
+    val (list, nextMode, nextCommand) = splitSpaces(0, false, false, Nil, Nil, false, false)
+    (mapArguments(list, None, Map()), nextCommand.map((nextMode, _)))
+  }
 
   def keySet: Set[String] = arguments.keys.toSet
 
@@ -94,9 +113,19 @@ class Arguments(data: String) {
   def freeValue: ArgumentValue = {
     new ArgumentValue(arguments.get(""))
   }
+
+  def nextCommand: Option[(NextMode, String)] = this.nextCommandOption
 }
 
 object Arguments {
+  sealed trait NextMode
+
+  object NextMode {
+    case object None extends NextMode
+    case object OnSuccess extends NextMode
+    case object OnFail extends NextMode
+  }
+
   val empty: Arguments = Arguments("")
 
   def apply(data: String): Arguments = {
