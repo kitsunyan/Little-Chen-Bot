@@ -20,16 +20,14 @@ trait PixivCommand extends Command with ExtractImage {
     super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_SAUCENAO_FD) :: list, locale)
   }
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(_, _, _), super.handleMessage, filterChat, _.soft)
   }
 
   class PixivException(override val userMessage: Option[String], message: String)
     extends Exception(message) with UserMessageException
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     def sendSaucenaoRequest(typedFile: TypedFile): Future[List[Long]] = {
       http("https://saucenao.com/search.php")
         .file(typedFile.multipart("file"))
@@ -231,7 +229,8 @@ trait PixivCommand extends Command with ExtractImage {
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else {
       val indexOption = arguments("i", "index").asInt
 
@@ -240,6 +239,7 @@ trait PixivCommand extends Command with ExtractImage {
           .unitFlatMap(extractUrlsListFromWorkspace)
           .flatMap(fetchImageByIndex(index))
           .flatMap(replyWithImage)
+          .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       } getOrElse {
         checkArguments(arguments)
@@ -248,8 +248,9 @@ trait PixivCommand extends Command with ExtractImage {
             .flatMap(sendSaucenaoRequest)
             .flatMap(readPixivResults)
             .flatMap(storeResponseToWorkspace)
-            .flatMap((replyWithPreview _).tupled))
-          .recoverWith[Any](message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
+            .flatMap((replyWithPreview _).tupled)
+            .statusMap(Status.Success))
+          .recoverWith(message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
       }
     }
   }

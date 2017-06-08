@@ -17,13 +17,11 @@ trait GoogleCommand extends Command with ExtractImage {
     super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_GOOGLE_FD) :: list, locale)
   }
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(_, _, _), super.handleMessage, filterChat, _.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     def sendGoogleRequest(typedFile: TypedFile): Future[String] = {
       http("https://images.google.com/searchbyimage/upload")
         .file(typedFile.multipart("encoded_image"))
@@ -176,7 +174,8 @@ trait GoogleCommand extends Command with ExtractImage {
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else {
       val indexOption = arguments("i", "index").asInt
       val asDocument = arguments("d", "as-document").nonEmpty
@@ -186,16 +185,18 @@ trait GoogleCommand extends Command with ExtractImage {
           .unitFlatMap(extractUrlsListFromWorkspace)
           .flatMap(fetchImageByIndex(index))
           .flatMap(replyWithImage(asDocument))
+          .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
-      } getOrElse {
+      }.getOrElse {
         checkArguments(arguments)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)
             .flatMap(sendGoogleRequest)
             .map(parseImages)
             .flatMap(storeResponseToWorkspace)
-            .flatMap((replyWithPreview _).tupled))
-          .recoverWith[Any](message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
+            .flatMap((replyWithPreview _).tupled)
+            .statusMap(Status.Success))
+          .recoverWith(message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
       }
     }
   }

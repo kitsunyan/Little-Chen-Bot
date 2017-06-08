@@ -22,14 +22,13 @@ trait ControlCommand extends Command {
 
   def chatForAlias(alias: String): Option[Long]
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal(filterChat.soft), super.handleMessage, filterChat, _.hard)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(filterChat.soft)(_, _, _),
+      super.handleMessage, filterChat, _.hard)
   }
 
   private def handleMessageInternal(softFiltered: Boolean)
-    (arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+    (implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     val ownerMessage = botOwner.exists(id => message.from.exists(_.id == id))
 
     if (arguments("h", "help").nonEmpty) {
@@ -59,16 +58,20 @@ trait ControlCommand extends Command {
             None
           }
         })
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else if (softFiltered && arguments("check-proxy").nonEmpty) {
       checkArguments(arguments, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           http("https://gelbooru.com", proxy = true)
             .runString(HttpFilters.ok)
             .flatMap(_ => replyQuote(locale.IT_WORKS))
-            .recoverWith((e: Throwable) => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}"))
+            .statusMap(Status.Success)
+            .recoverWith((e: Throwable) => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}")
+              .statusMap(Status.Fail))
         } else {
           replyQuote(locale.PROXY_IS_NOT_PRESENT)
+            .statusMap(Status.Fail)
         }
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && ownerMessage && arguments("restart-proxy").nonEmpty) {
@@ -77,11 +80,15 @@ trait ControlCommand extends Command {
           restartProxyCommand.map { restartProxyCommand =>
             Future(Utils.exec(None, restartProxyCommand))
               .flatMap(_ => replyQuote(locale.READY))
+              .statusMap(Status.Success)
               .recoverWith((e: Throwable) =>
-                replyQuote(s"${locale.SOMETHING_WENT_WRONG}\n${userMessageForException(e)}"))
-          }.getOrElse(replyQuote(locale.I_DONT_KNOW_HOW))
+                replyQuote(s"${locale.SOMETHING_WENT_WRONG}\n${userMessageForException(e)}")
+                  .statusMap(Status.Fail))
+          }.getOrElse(replyQuote(locale.I_DONT_KNOW_HOW)
+            .statusMap(Status.Fail))
         } else {
           replyQuote(locale.PROXY_IS_NOT_PRESENT)
+            .statusMap(Status.Fail)
         }
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && ownerMessage && arguments("m", "send-message").nonEmpty) {
@@ -91,7 +98,8 @@ trait ControlCommand extends Command {
           .getOrElse(message.chat.id)
 
         request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
-          .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
+          .flatMap(_ => replyQuote(locale.MESSAGE_SENT)
+            .statusMap(Status.Success))
           .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && arguments("set-locale").nonEmpty) {
@@ -100,8 +108,8 @@ trait ControlCommand extends Command {
           (if (message.chat.`type` == ChatType.Private || botOwner.contains(user.id)) {
             Future.unit
           } else {
-            request(GetChatAdministrators(Left(message.chat.id))).map { administators =>
-              if (!administators.map(_.user.id).contains(user.id)) {
+            request(GetChatAdministrators(Left(message.chat.id))).map { administrators =>
+              if (!administrators.map(_.user.id).contains(user.id)) {
                 throw new CommandException(locale.ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE)
               }
             }
@@ -114,12 +122,14 @@ trait ControlCommand extends Command {
               val locales = Locale.locales.map(_.name).reduceLeft(_ + ", " + _)
               throw new CommandException(locale.INVALID_LOCALE_LIST_FORMAT.format(localeString.getOrElse(""), locales))
             }
-          }.recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
+          }.statusMap(Status.Success)
+            .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
         }.getOrElse(throw new Exception("Can not obtain user ID."))
       }.recoverWith(handleError(None)(message))
     } else if (arguments("request-permission").nonEmpty) {
       if (softFiltered) {
         replyQuote(locale.PERMISSION_IS_ALREADY_GRANTED)
+          .statusMap(Status.Fail)
       } else {
         botOwner.map { botOwner =>
           val chatId = message.chat.id
@@ -133,21 +143,24 @@ trait ControlCommand extends Command {
 
           request(SendMessage(Left(botOwner), ownerMessage))
             .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
+            .statusMap(Status.Success)
             .recoverWith(handleError(None)(message))
         }.getOrElse {
           replyQuote(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)
+            .statusMap(Status.Fail)
         }
       }
     } else {
       checkArguments(arguments).unitFlatMap {
         replyQuote(locale.UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT.format(s"`/${commands.head} --help`"),
           Some(ParseMode.Markdown))
+          .statusMap(Status.Fail)
       }.recoverWith(handleError(None)(message))
     }
   }
 
-  override def handleNotPermittedWarning(locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
+  override def handleNotPermittedWarning(implicit message: Message, locale: Locale): Future[Any] = {
+    implicit val argumentsImplicit = Arguments.empty
 
     replyQuote(locale.YOU_ARE_NOT_PERMITTED_CONTACT_OWNER_FORMAT
       .format("`/chenctl --request-permission \"Your message\"`"), Some(ParseMode.Markdown))

@@ -31,13 +31,11 @@ trait RateCommand extends Command with ExtractImage {
     "CAADAgADxgEAAiX3NwgpkLZRMe1h0wI" ::
     Nil
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(_, _, _), super.handleMessage, filterChat, _.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     def obtainEverypixelToken: Future[String] = {
       val url = "https://everypixel.com/aesthetics"
 
@@ -119,15 +117,17 @@ trait RateCommand extends Command with ExtractImage {
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else {
       checkArguments(arguments)
         .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
           .zip(obtainEverypixelToken)
           .flatMap((sendEverypixelRequest _).tupled)
-          .flatMap(replyWithRating))
-        .recoverWith[Any](message)(handleError(Some(locale.RATING_REQUEST_FV_FS)))
+          .flatMap(replyWithRating)
+          .statusMap(Status.Success))
+        .recoverWith(message)(handleError(Some(locale.RATING_REQUEST_FV_FS)))
     }
   }
 }

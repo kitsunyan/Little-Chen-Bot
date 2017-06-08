@@ -19,13 +19,11 @@ trait IqdbCommand extends Command with ExtractImage {
     super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_IQDB_FD) :: list, locale)
   }
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(_, _, _), super.handleMessage, filterChat, _.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     case class IqdbResult(index: Int, url: String, previewUrl: Option[String], blurMode: Utils.BlurMode,
       booruService: BooruService, alias: Option[String], similarity: Int, matches: Boolean)
 
@@ -179,7 +177,9 @@ trait IqdbCommand extends Command with ExtractImage {
 
         throw (if (additionalResults.isEmpty) result.exception else None).getOrElse {
           result.exception.map(handleException(Some(messageWithImage)))
-          new RecoverException(messageTextFuture.flatMap(replyWithQueryList(messageWithImage, _, previewBlanks)))
+          new RecoverException(messageTextFuture
+            .flatMap(replyWithQueryList(messageWithImage, _, previewBlanks))
+            .statusMap(if (query) Status.Success else Status.Fail))
         }
       })
     }
@@ -355,7 +355,8 @@ trait IqdbCommand extends Command with ExtractImage {
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else if (arguments("example").nonEmpty) {
       checkArguments(arguments, "example").unitFlatMap {
         replyQuote(s"${locale.EXAMPLES_OF_USAGE_FS}:" +
@@ -389,7 +390,8 @@ trait IqdbCommand extends Command with ExtractImage {
           "\n    `/iqdb -c --reset`" +
           "\n    `/iqdb -c --reset -s 50`",
           Some(ParseMode.Markdown))
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else if (arguments("list").nonEmpty) {
       checkArguments(arguments, "list").unitFlatMap {
         replyQuote(s"${locale.SUPPORTED_BOORU_SERVICES_FS}:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
@@ -398,7 +400,8 @@ trait IqdbCommand extends Command with ExtractImage {
           val aliasesText = if (aliases.isEmpty) "" else s" (aliases: _${aliases}_)"
           (i + 1, s"$a\n$i: $primaryDomain$aliasesText")
         }._2, Some(ParseMode.Markdown))
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else if (arguments("c", "configure").nonEmpty) {
       val reset = arguments("reset").nonEmpty
 
@@ -407,8 +410,9 @@ trait IqdbCommand extends Command with ExtractImage {
           .unitFlatMap(IqdbConfigurationData.get(userId))
           .map(configureItem(userId, similarityOption, priorityOption, reset))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
+          .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
-      }.getOrElse(Future.unit)
+      }.getOrElse(Future.successful(Status.Fail))
     } else {
       val indexOption = arguments("i", "index").asInt
       val query = arguments("q", "query").nonEmpty
@@ -430,8 +434,9 @@ trait IqdbCommand extends Command with ExtractImage {
           .map(filterByIndex(indexOption))
           .flatMap(readBooruImages(messageWithImage, query))
           .flatMap(replyWithImage(!tags))
-          .flatMap((replyWithTags(tags) _).tupled))
-        .recoverWith[Any](message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
+          .flatMap((replyWithTags(tags) _).tupled)
+          .statusMap(Status.Success))
+        .recoverWith(message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
     }
   }
 }

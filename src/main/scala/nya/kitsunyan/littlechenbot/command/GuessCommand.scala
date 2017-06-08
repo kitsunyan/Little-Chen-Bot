@@ -37,8 +37,8 @@ trait GuessCommand extends Command {
   private case class CreateGame(messageId: Long, game: Game, locale: Locale)
   private case class UpdateGame(key: Long, messageId: Long)
   private case class RemoveGame(key: Long)
-  private case class HandleRunningGame(replyToMessageId: Long,
-    next: (Long, Locale) => Option[Game] => Future[Option[Game]])
+  private case class HandleRunningGame(message: Message, replyToMessageId: Long,
+    next: (Message, Locale, Long) => Option[Game] => Future[Option[Game]])
   private case object CleanupInstances
 
   private val actor = ActorSystem("GuessCommand").actorOf(Props(new GuessActor))
@@ -60,11 +60,11 @@ trait GuessCommand extends Command {
       case RemoveGame(key) =>
         instances.remove(key)
         sender ! {}
-      case HandleRunningGame(replyToMessageId, next) =>
+      case HandleRunningGame(message, replyToMessageId, next) =>
         val futureOption = instances.find { case (_, instance) =>
           instance.messageIds.contains(replyToMessageId)
         }.map { case (key, instance) =>
-          val newInstance = instance.copy(future = instance.future.flatMap(next(key, instance.locale)),
+          val newInstance = instance.copy(future = instance.future.flatMap(next(message, instance.locale, key)),
             lastUpdateTime = System.currentTimeMillis)
           instances += key -> newInstance
           newInstance.future
@@ -78,22 +78,25 @@ trait GuessCommand extends Command {
     }
   }
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
     if (filterChat.soft) {
       (actor ? CleanupInstances).flatMap { _ =>
-        message.replyToMessage.map { replyToMessage =>
-          (actor ? HandleRunningGame(replyToMessage.messageId, handleRunningGame)).mapTo[Option[Future[Any]]]
-        }.getOrElse(Future.successful(None)).flatMap(_.getOrElse {
-          filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
-        })
+        message.initial.replyToMessage.map { replyToMessage =>
+          (actor ? HandleRunningGame(message.initial, replyToMessage.messageId, handleRunningGame))
+            .mapTo[Option[Future[Any]]]
+        }.getOrElse(Future.successful(None)).flatMap(_
+          .map(_ => Future.successful(Status.Cancel))
+          .getOrElse(filterMessage(message, commands, handleMessageInternal(_, _, _),
+            super.handleMessage, filterChat, _.soft)))
       }
     } else {
-      super.handleMessage(filterChat)
+      super.handleMessage(message, filterChat)
     }
   }
 
-  private def handleRunningGame(key: Long, locale: Locale)(game: Option[Game])
-    (implicit message: Message): Future[Option[Game]] = {
+  private def handleRunningGame(message: Message, locale: Locale, key: Long)(game: Option[Game]):
+    Future[Option[Game]] = {
+    implicit val messageImplicit = message
     implicit val localeImplicit = locale
 
     def parseMessage(game: Game): Boolean = {
@@ -180,9 +183,7 @@ trait GuessCommand extends Command {
       .getOrElse(Future.successful(None))
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     def queryImages(tags: List[String]): Future[List[String]] = {
       val fullTags = ("-rating:explicit" ::
         "-rating:questionable" ::
@@ -277,7 +278,8 @@ trait GuessCommand extends Command {
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else {
       val tags = arguments("t", "tags").asString
         .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
@@ -287,6 +289,7 @@ trait GuessCommand extends Command {
         .unitFlatMap(queryImages(tags))
         .flatMap(readRandomImage(tags))
         .flatMap(createSession)
+        .statusMap(Status.Success)
         .recoverWith(handleError(Some(locale.CREATING_A_SESSION_FV_FS))(message))
     }
   }

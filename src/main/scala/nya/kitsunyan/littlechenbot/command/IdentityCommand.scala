@@ -14,20 +14,19 @@ trait IdentityCommand extends Command {
     super.prependDescription(Description(commands, locale.WHO_ARE_YOU_FD) :: list, locale)
   }
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.hard)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(_, _, _), super.handleMessage, filterChat, _.hard)
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
         replyMan(locale.GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF,
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else {
       checkArguments(arguments).unitFlatMap {
         val targetMessage = message.replyToMessage.getOrElse(message)
@@ -42,6 +41,7 @@ trait IdentityCommand extends Command {
           .map(_.id.toString)
           .getOrElse("unknown")
         replyQuote(s"Name: $name\nUsername: $username\nChat ID: $chatId\nUser ID: $userId")
+          .statusMap(Status.Success)
       }.recoverWith(handleError(None)(message))
     }
   }

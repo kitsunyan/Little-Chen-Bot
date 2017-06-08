@@ -27,14 +27,16 @@ trait Command extends BotBase with AkkaDefaults {
 
   def handleException(causalMessage: Option[Message])(e: Throwable): Unit
 
-  def handleError(during: Option[String])(causalMessage: Message)(implicit message: Message, locale: Locale):
-    PartialFunction[Throwable, Future[Any]] = {
+  def handleError(during: Option[String])(causalMessage: Message)
+    (implicit message: Message, arguments: Arguments, locale: Locale): PartialFunction[Throwable, Future[Status]] = {
     case e: RecoverException =>
       e.future
     case e: CommandException =>
       replyQuote(e.getMessage, e.parseMode)
+      Future.successful(Status.Fail)
     case e: Exception =>
       handleErrorCommon(e, causalMessage, during)
+      Future.successful(Status.Fail)
   }
 
   def handleErrorCommon(e: Exception, causalMessage: Message, during: Option[String])
@@ -67,7 +69,7 @@ trait Command extends BotBase with AkkaDefaults {
       .map(_.getOrElse(Locale.English))
   }
 
-  private def filterCommands(commands: List[String], botNickname: String)(text: String): Option[String] = {
+  private def filterCommands(commands: List[String], botNickname: String, text: String): Option[String] = {
     commands.foldLeft[Option[String]](None) { (a, command) =>
       a orElse {
         val shortCommand = "/" + command
@@ -86,39 +88,60 @@ trait Command extends BotBase with AkkaDefaults {
     }
   }
 
-  final def filterMessage(commands: List[String], success: (Arguments, Locale) => Future[Any],
-    fail: FilterChat => Future[Any], filterChat: FilterChat, allow: FilterChat => Boolean)
-    (implicit message: Message): Future[Any] = {
+  final def filterMessage(message: ExtendedMessage, commands: List[String],
+    success: (Message, Arguments, Locale) => Future[Status], fail: (ExtendedMessage, FilterChat) => Future[Status],
+    filterChat: FilterChat, allow: FilterChat => Boolean): Future[Status] = {
     bot.flatMap { bot =>
-      (message.text orElse message.caption)
-        .flatMap(filterCommands(commands, bot.nickname)).map { commandLine =>
+      filterCommands(commands, bot.nickname, message.commandText).map { commandLine =>
         if (allow(filterChat)) {
-          getLocale(message.chat.id).flatMap(success(new Arguments(commandLine), _))
+          getLocale(message.initial.chat.id).flatMap(success(message.initial, Arguments(commandLine), _))
         } else {
-          fail(filterChat.copy(filtered = true))
+          fail(message, filterChat.copy(filtered = true))
         }
-      }.getOrElse(fail(filterChat))
+      }.getOrElse(fail(message, filterChat))
     }
   }
 
-  class RecoverException(val future: Future[Any]) extends Exception
+  class RecoverException(val future: Future[Status]) extends Exception
 
   class CommandException(message: String, val parseMode: Option[ParseMode.ParseMode] = None) extends Exception(message)
 
-  final override def onMessage(message: Message): Unit = {
-    handleMessage(filterChat(message))(message)
-      .recover(handleException(Some(message))(_))
+  case class ExtendedMessage(initial: Message, firstCommand: Boolean, commandText: String)
+
+  sealed trait Status
+
+  object Status {
+    case object Cancel extends Status
+    private[Command] case class SuccessMatch(arguments: Arguments) extends Status
+    private[Command] case class FailMatch(arguments: Arguments) extends Status
+
+    def Success(implicit arguments: Arguments): Status = SuccessMatch(arguments)
+    def Fail(implicit arguments: Arguments): Status = FailMatch(arguments)
   }
 
-  def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
+  final override def onMessage(message: Message): Unit = {
+    onMessageExtend(message, false, message.text orElse message.caption)
+  }
+
+  private def onMessageExtend(message: Message, firstCommand: Boolean, commandText: Option[String]): Future[Status] = {
+    commandText
+      .map(_.trim)
+      .filter(_.nonEmpty)
+      .map(t => handleMessage(ExtendedMessage(message, firstCommand, t), filterChat(message))
+        .recover((handleException(Some(message))(_)) -> Status.Cancel)).getOrElse(Future.successful(Status.Cancel))
+  }
+
+  def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
     if (filterChat.hard && !filterChat.soft && filterChat.filtered) {
-      getLocale(message.chat.id).flatMap(handleNotPermittedWarning)
+      getLocale(message.initial.chat.id)
+        .flatMap(handleNotPermittedWarning(message.initial, _))
+        .statusMap(Status.Cancel)
     } else {
-      Future.unit
+      Future.successful(Status.Cancel)
     }
   }
 
-  def handleNotPermittedWarning(locale: Locale)(implicit message: Message): Future[Any] = Future.unit
+  def handleNotPermittedWarning(implicit message: Message, locale: Locale): Future[Any] = Future.unit
 
   def checkArguments(arguments: Arguments, possibleArguments: String*)(implicit locale: Locale): Future[Unit] = {
     val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String])
@@ -244,5 +267,13 @@ trait Command extends BotBase with AkkaDefaults {
 
   implicit def unitFuture(future: Future[Unit]): UnitFuture = {
     new UnitFuture(future)
+  }
+
+  class StatusFuture[T](future: Future[T]) {
+    def statusMap(status: Status): Future[Status] = future.map(_ => status)
+  }
+
+  implicit def statusFuture[T](future: Future[T]): StatusFuture[T] = {
+    new StatusFuture(future)
   }
 }

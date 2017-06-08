@@ -95,3 +95,11 @@ class Arguments(data: String) {
     new ArgumentValue(arguments.get(""))
   }
 }
+
+object Arguments {
+  val empty: Arguments = Arguments("")
+
+  def apply(data: String): Arguments = {
+    new Arguments(data)
+  }
+}

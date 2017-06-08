@@ -15,20 +15,19 @@ trait HelpCommand extends Command {
     super.prependDescription(Description(commands, locale.DISPLAY_THIS_HELP_FD) :: list, locale)
   }
 
-  override def handleMessage(filterChat: FilterChat)(implicit message: Message): Future[Any] = {
-    filterMessage(commands, handleMessageInternal, super.handleMessage, filterChat, _.soft)
+  override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
+    filterMessage(message, commands, handleMessageInternal(_, _, _), super.handleMessage, filterChat, _.soft)
   }
 
-  private def handleMessageInternal(arguments: Arguments, locale: Locale)(implicit message: Message): Future[Any] = {
-    implicit val localeImplicit = locale
-
+  private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
         replyMan(locale.DISPLAY_LIST_OF_SUPPORTED_COMMANDS,
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
-      }.recoverWith(handleError(None)(message))
+      }.statusMap(Status.Success)
+        .recoverWith(handleError(None)(message))
     } else {
       checkArguments(arguments).unitFlatMap {
         val listOfCommands = prependDescription(Nil, locale)
@@ -38,6 +37,7 @@ trait HelpCommand extends Command {
 
         replyQuote(s"$listOfCommands\n\n${locale.YOU_CAN_VIEW_A_HELP_FORMAT.format("`/command --help`")}",
           Some(ParseMode.Markdown))
+          .statusMap(Status.Success)
       }.recoverWith(handleError(None)(message))
     }
   }
