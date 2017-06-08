@@ -21,6 +21,7 @@ sealed trait Locale {
   val COPYRIGTHS_FS: String
   val CREATING_A_SESSION_FV_FS: String
   val CURRENT_CONFIGURATION_FS: String
+  val DELETE_QUOTED_MESSAGE: String
   val DIFFERENT_COMMANDS_FORMAT: String
   val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String
   val DISPLAY_THIS_HELP_FD: String
@@ -57,7 +58,7 @@ sealed trait Locale {
   val NO_IMAGES_FOUND_FS: String
   val NOT_PARSED_FS: String
   val NOW_REPLY_ME_WITH_FORMAT: String
-  val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String
+  val ONLY_ADMINISTRATOR_CAN_DO_IT: String
   val PERMISSION_IS_ALREADY_GRANTED: String
   val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String
   val PRINT_ALL_SUPPORTED_BOORU_SERVICES: String
@@ -142,6 +143,8 @@ object Locale {
       "creating a session"
     override val CURRENT_CONFIGURATION_FS: String =
       "Current configuration"
+    override val DELETE_QUOTED_MESSAGE: String =
+      "Delete quoted message"
     override val DIFFERENT_COMMANDS_FORMAT: String =
       "%s and %s are different commands!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
@@ -214,8 +217,8 @@ object Locale {
       "Not parsed"
     override val NOW_REPLY_ME_WITH_FORMAT: String =
       "Now reply me with %s!"
-    override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
-      "Only administrator can change the locale."
+    override val ONLY_ADMINISTRATOR_CAN_DO_IT: String =
+      "Only administrator can do it."
     override val PERMISSION_IS_ALREADY_GRANTED: String =
       "Permission is already granted!"
     override val PLEASE_REPLY_TO_MESSAGE_WITH_IMAGE_FORMAT: String =
@@ -335,6 +338,8 @@ object Locale {
       "создании сессии"
     override val CURRENT_CONFIGURATION_FS: String =
       "Текущая конфигурация"
+    override val DELETE_QUOTED_MESSAGE: String =
+      "Удалить процитированное сообщение"
     override val DIFFERENT_COMMANDS_FORMAT: String =
       "%s и %s — разные команды!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
@@ -407,7 +412,7 @@ object Locale {
       "Не распарсила"
     override val NOW_REPLY_ME_WITH_FORMAT: String =
       "Теперь ответь мне, написав %s!"
-    override val ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE: String =
+    override val ONLY_ADMINISTRATOR_CAN_DO_IT: String =
       "Вы не модератор, чтобы указывать мне!"
     override val PERMISSION_IS_ALREADY_GRANTED: String =
       "Разрешение уже получено!"

@@ -31,6 +31,20 @@ trait ControlCommand extends Command {
     (implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     val ownerMessage = botOwner.exists(id => message.from.exists(_.id == id))
 
+    def checkAdministratorOrOwner: Future[Unit] = {
+      message.from.map { user =>
+        if (message.chat.`type` == ChatType.Private || botOwner.contains(user.id)) {
+          Future.unit
+        } else {
+          request(GetChatAdministrators(Left(message.chat.id))).map { administrators =>
+            if (!administrators.map(_.user.id).contains(user.id)) {
+              throw new CommandException(locale.ONLY_ADMINISTRATOR_CAN_DO_IT)
+            }
+          }
+        }
+      }.getOrElse(Future.failed(new Exception("Can not obtain user ID.")))
+    }
+
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
         val commands =
@@ -42,6 +56,8 @@ trait ControlCommand extends Command {
             locale.SEND_MESSAGE_FROM_BOT) ::
           (true, true, List("-t", "--target-chat"), Some("long or string"),
             locale.TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT.format("`--send-message`")) ::
+          (true, false, List("-d", "--delete-message"), Some("string"),
+            locale.DELETE_QUOTED_MESSAGE) ::
           (true, false, List("--set-locale"), Some("string"),
             locale.SET_LOCALE_FOR_THIS_CHAT) ::
           (false, false, List("--request-permission"), Some("string"),
@@ -102,29 +118,37 @@ trait ControlCommand extends Command {
             .statusMap(Status.Success))
           .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
       }.recoverWith(handleError(None)(message))
-    } else if (softFiltered && arguments("set-locale").nonEmpty) {
-      checkArguments(arguments, "set-locale").unitFlatMap {
-        message.from.map { user =>
-          (if (message.chat.`type` == ChatType.Private || botOwner.contains(user.id)) {
-            Future.unit
-          } else {
-            request(GetChatAdministrators(Left(message.chat.id))).map { administrators =>
-              if (!administrators.map(_.user.id).contains(user.id)) {
-                throw new CommandException(locale.ONLY_ADMINISTRATOR_CAN_CHANGE_LOCALE)
+    } else if (softFiltered && arguments("d", "delete-message").nonEmpty) {
+      checkArguments(arguments, "d", "delete-message").unitFlatMap {
+        checkAdministratorOrOwner.unitFlatMap {
+          val messageIdFuture = bot.map { bot =>
+            message.replyToMessage.flatMap { replyToMessage =>
+              if (replyToMessage.from.map(_.id.toLong).contains(bot.id)) {
+                Some(replyToMessage.messageId)
+              } else {
+                None
               }
             }
-          }).unitFlatMap {
-            val localeString = arguments("set-locale").asString
-            localeString.flatMap(Locale.get).map { newLocale =>
-              LocaleConfigurationData.set(message.chat.id, newLocale)
-                .unitFlatMap(replyQuote(newLocale.LOCALE_INSTALLED))
-            }.getOrElse {
-              val locales = Locale.locales.map(_.name).reduceLeft(_ + ", " + _)
-              throw new CommandException(locale.INVALID_LOCALE_LIST_FORMAT.format(localeString.getOrElse(""), locales))
-            }
-          }.statusMap(Status.Success)
-            .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
-        }.getOrElse(throw new Exception("Can not obtain user ID."))
+          }
+
+          messageIdFuture.flatMap(_.map(i => request(DeleteMessage(Left(message.source), i)))
+            .getOrElse(throw new CommandException(locale.ARE_YOU_KIDDING_ME)))
+        }.statusMap(Status.Success)
+          .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
+      }.recoverWith(handleError(None)(message))
+    } else if (softFiltered && arguments("set-locale").nonEmpty) {
+      checkArguments(arguments, "set-locale").unitFlatMap {
+        checkAdministratorOrOwner.unitFlatMap {
+          val localeString = arguments("set-locale").asString
+          localeString.flatMap(Locale.get).map { newLocale =>
+            LocaleConfigurationData.set(message.chat.id, newLocale)
+              .unitFlatMap(replyQuote(newLocale.LOCALE_INSTALLED))
+          }.getOrElse {
+            val locales = Locale.locales.map(_.name).reduceLeft(_ + ", " + _)
+            throw new CommandException(locale.INVALID_LOCALE_LIST_FORMAT.format(localeString.getOrElse(""), locales))
+          }
+        }.statusMap(Status.Success)
+          .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
       }.recoverWith(handleError(None)(message))
     } else if (arguments("request-permission").nonEmpty) {
       if (softFiltered) {
