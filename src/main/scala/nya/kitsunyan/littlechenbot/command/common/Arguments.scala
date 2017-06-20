@@ -53,20 +53,30 @@ class Arguments(data: String) {
     if (arguments.nonEmpty) {
       val argument = arguments.head
 
-      val parameter = if (argument.startsWith("--") && argument.length > 3) {
-        Some(argument.substring(2))
+      val (parameter, modifiedResult) = if (argument.startsWith("--") && argument.length > 3) {
+        (Some(argument.substring(2)), result)
       } else if (argument.startsWith("—") && argument.length > 2) {
-        Some(argument.substring(1))
-      } else if (argument.startsWith("-") && argument.length == 2) {
-        Some(argument.substring(1))
+        (Some(argument.substring(1)), result)
+      } else if (argument.startsWith("-") && argument.length > 1) {
+        val parameter = argument.substring(1)
+
+        val (modifiedParameter, modifiedResult) = if (parameter.length > 1) {
+          (parameter.charAt(parameter.length - 1).toString, parameter.substring(0, parameter.length - 1)
+            .foldLeft(result)((r, c) => r + (c.toString -> "")))
+        } else {
+          (parameter, result)
+        }
+
+        (Some(modifiedParameter), modifiedResult)
       } else {
-        None
+        (None, result)
       }
 
       if (parameter.nonEmpty) {
-        mapArguments(arguments.tail, parameter, targetParameter.map(p => result + (p -> "")).getOrElse(result))
+        mapArguments(arguments.tail, parameter, targetParameter.map(p => modifiedResult + (p -> ""))
+          .getOrElse(modifiedResult))
       } else {
-        mapArguments(arguments.tail, None, result + (targetParameter.getOrElse("") -> argument))
+        mapArguments(arguments.tail, None, modifiedResult + (targetParameter.getOrElse("") -> argument))
       }
     } else {
       targetParameter.map(p => result + (p -> "")).getOrElse(result)
