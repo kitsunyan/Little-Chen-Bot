@@ -83,6 +83,7 @@ sealed trait Locale {
   val SET_LOCALE_FOR_THIS_CHAT: String
   val SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES: String
   val SET_PRIORITY_FOR_BOORU_SERVICES: String
+  val SHOW_UPTIME: String
   val SOMETHING_WENT_WRONG: String
   val SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT: String
   val SUPPORTED_BOORU_SERVICES_FS: String
@@ -269,6 +270,8 @@ object Locale {
       "Set minimum allowed similarity for found images."
     override val SET_PRIORITY_FOR_BOORU_SERVICES: String =
       "Set priority for \\*booru services."
+    override val SHOW_UPTIME: String =
+      "Show uptime."
     override val SOMETHING_WENT_WRONG: String =
       "Something went wrong!"
     override val SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT: String =
@@ -464,6 +467,8 @@ object Locale {
       "Установить минимальное сходство для найденых картинок."
     override val SET_PRIORITY_FOR_BOORU_SERVICES: String =
       "Установить приоритет для \\*booru сервисов."
+    override val SHOW_UPTIME: String =
+      "Показать время работы."
     override val SOMETHING_WENT_WRONG: String =
       "Что-то пошло не так!"
     override val SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT: String =

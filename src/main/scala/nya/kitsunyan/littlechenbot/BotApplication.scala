@@ -22,6 +22,8 @@ object BotApplication extends App {
     override val bot: Future[Bot] = getMe.map(m => Bot(m.username.getOrElse(""), m.id))
     override val botOwner: Option[Long] = configuration.long("bot.owner")
 
+    override val startTime: Long = executionStart
+
     private case class Chat(id: Long, alias: Option[String], foreignCommands: Option[List[String]])
 
     private val chats = configuration.configurationList("bot.chats")
@@ -29,7 +31,6 @@ object BotApplication extends App {
 
     private val chatsAnyPrivate = configuration.boolean("bot.chatsAnyPrivate").getOrElse(false)
     private val chatsAnyGroup = configuration.boolean("bot.chatsAnyGroup").getOrElse(false)
-    private val startTime = executionStart / 1000
 
     override val proxy: Option[java.net.Proxy] = {
       for {
@@ -57,7 +58,7 @@ object BotApplication extends App {
     override def foremanImage: Option[String] = configuration.string("bot.foremanImage")
 
     override def filterChat(message: Message): FilterChat = {
-      if (message.date < startTime) {
+      if (message.date < startTime / 1000) {
         FilterChat(false, false)
       } else {
         val soft = chats.map(_.id).contains(message.chat.id) ||

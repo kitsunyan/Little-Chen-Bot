@@ -22,6 +22,8 @@ trait ControlCommand extends Command {
 
   def chatForAlias(alias: String): Option[Long]
 
+  val startTime: Long
+
   override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
     filterMessage(message, commands, handleMessageInternal(filterChat.soft)(_, _, _),
       super.handleMessage, filterChat, _.hard)
@@ -62,6 +64,8 @@ trait ControlCommand extends Command {
             locale.SET_LOCALE_FOR_THIS_CHAT) ::
           (false, false, List("--request-permission"), Some("string"),
             locale.REQUEST_PERMISSION_TO_INTERACT_WITH_BOT) ::
+          (true, false, List("--uptime"), None,
+            locale.SHOW_UPTIME) ::
           (false, false, List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil
@@ -174,6 +178,18 @@ trait ControlCommand extends Command {
             .statusMap(Status.Fail)
         }
       }
+    } else if (arguments("uptime").nonEmpty) {
+      val uptime = (System.currentTimeMillis - startTime) / 1000
+      val seconds = uptime % 60
+      val minutes = uptime / 60 % 60
+      val hours = uptime / 60 / 60 % 24
+      val days = uptime / 60 / 60 / 24
+      val uptimeString = s"${days}d ${hours}h ${minutes}m ${seconds}s"
+
+      checkArguments(arguments, "uptime")
+        .unitFlatMap(replyQuote(uptimeString)
+          .statusMap(Status.Success))
+        .recoverWith(handleError(None)(message))
     } else {
       checkArguments(arguments).unitFlatMap {
         replyQuote(locale.UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT.format(s"`/${commands.head} --help`"),
