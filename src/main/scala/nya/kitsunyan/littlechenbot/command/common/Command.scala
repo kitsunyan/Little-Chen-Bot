@@ -10,7 +10,7 @@ import info.mukel.telegrambot4s.models._
 import scala.concurrent.Future
 import scala.language.implicitConversions
 
-trait Command extends BotBase with AkkaDefaults {
+trait Command extends BotBase with AkkaDefaults with GlobalExecutionContext {
   case class Bot(nickname: String, id: Long)
 
   val bot: Future[Bot]
@@ -119,7 +119,7 @@ trait Command extends BotBase with AkkaDefaults {
     def Fail(implicit arguments: Arguments): Status = FailMatch(arguments)
   }
 
-  final override def onMessage(message: Message): Unit = {
+  final override def receiveMessage(message: Message): Unit = {
     onMessageExtend(message, false, message.text orElse message.caption)
   }
 
@@ -169,12 +169,12 @@ trait Command extends BotBase with AkkaDefaults {
 
   def replyQuote(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {
-    request(SendMessage(Left(message.source), text, parseMode, replyToMessageId = Some(message.messageId)))
+    request(SendMessage(message.source, text, parseMode, replyToMessageId = Some(message.messageId)))
   }
 
   def reply(text: String, parseMode: Option[ParseMode.ParseMode] = None)
     (implicit message: Message): Future[Message] = {
-    request(SendMessage(Left(message.source), text, parseMode))
+    request(SendMessage(message.source, text, parseMode))
   }
 
   def replyMan(description: String, list: List[(List[String], Option[String], String)])

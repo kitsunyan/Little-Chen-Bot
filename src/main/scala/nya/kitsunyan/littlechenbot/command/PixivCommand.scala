@@ -121,7 +121,7 @@ trait PixivCommand extends Command with ExtractImage {
       workspace.map { workspace =>
         val json = compact(render(pixivResults.map(r => ("urlNoExtension" -> r.imageUrlNoExtension) ~
           ("pageUrl" -> r.pageUrl))))
-        request(SendMessage(Left(workspace), json))
+        request(SendMessage(workspace, json))
           .map(_.messageId)
           .map(WorkspaceRequest(commands.head))
           .map((_, pixivResults))
@@ -171,7 +171,7 @@ trait PixivCommand extends Command with ExtractImage {
       }.flatMap { list =>
         val preview = Utils.drawPreview(list)
         preview.map { preview =>
-          request(SendPhoto(Left(message.source), Left(InputFile("preview.png", preview)),
+          request(SendPhoto(message.source, InputFile("preview.png", preview),
             replyToMessageId = Some(message.messageId), caption = Some(trimCaption(messageText))))
         }.getOrElse(replyQuote(messageText))
       }
@@ -185,7 +185,7 @@ trait PixivCommand extends Command with ExtractImage {
               (message.text orElse message.caption)
                 .flatMap(WorkspaceRequest.parse(commands.head))
                 .map { messageId =>
-                  request(SendMessage(Left(workspace), "query", replyToMessageId = Some(messageId)))
+                  request(SendMessage(workspace, "query", replyToMessageId = Some(messageId)))
                     .map(_.replyToMessage.flatMap(_.text).map { text =>
                       import org.json4s._
                       import org.json4s.jackson.JsonMethods._
@@ -217,7 +217,7 @@ trait PixivCommand extends Command with ExtractImage {
     }
 
     def replyWithImage(imageData: ImageData): Future[Message] = {
-      request(SendDocument(Left(message.source), Left(InputFile(imageData.name, imageData.image)),
+      request(SendDocument(message.source, InputFile(imageData.name, imageData.image),
         replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
     }
 

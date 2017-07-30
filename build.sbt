@@ -4,7 +4,7 @@ name := "littlechenbot"
 
 version := "1.0"
 
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.3"
 
 scalacOptions :=
   "-unchecked" ::
@@ -15,12 +15,12 @@ scalacOptions :=
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies ++=
-  "info.mukel" %% "telegrambot4s" % "2.9.5" ::
+  "info.mukel" %% "telegrambot4s" % "3.0.4" ::
   "org.slf4j" % "slf4j-simple" % "1.7.25" ::
-  "org.json4s" %% "json4s-jackson" % "3.5.2" ::
-  "org.xerial" % "sqlite-jdbc" % "3.18.0" ::
-  "com.typesafe.slick" %% "slick" % "3.2.0" ::
-  "com.squareup.okhttp3" % "okhttp" % "3.8.0" ::
+  "org.json4s" %% "json4s-jackson" % "3.5.3" ::
+  "org.xerial" % "sqlite-jdbc" % "3.19.3" ::
+  "com.typesafe.slick" %% "slick" % "3.2.1" ::
+  "com.squareup.okhttp3" % "okhttp" % "3.8.1" ::
   Nil
 
 lazy val config = {

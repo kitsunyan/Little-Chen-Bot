@@ -2,7 +2,7 @@ package nya.kitsunyan.littlechenbot.command.common
 
 import nya.kitsunyan.littlechenbot.util.UserMessageException
 
-import info.mukel.telegrambot4s.api.AkkaImplicits
+import info.mukel.telegrambot4s.api._
 
 import okhttp3._
 
@@ -14,7 +14,7 @@ import scala.concurrent.Future
 import scala.language.implicitConversions
 
 trait Http {
-  this: AkkaImplicits =>
+  this: AkkaImplicits with BotExecutionContext =>
 
   val proxy: Option[java.net.Proxy]
 

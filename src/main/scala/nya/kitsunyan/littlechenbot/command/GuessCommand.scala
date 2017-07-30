@@ -141,7 +141,7 @@ trait GuessCommand extends Command {
         val text = s"${locale.A_WINNER_IS_YOU}\n\n${game.pageUrl}\n\n${locale.CHARACTERS_FS}: $characters"
 
         booruImageOption.map { booruImage =>
-          request(SendPhoto(Left(message.source), Left(InputFile(booruImage.name, booruImage.data)),
+          request(SendPhoto(message.source, InputFile(booruImage.name, booruImage.data),
             replyToMessageId = Some(message.messageId), caption = Some(text)))
         }.getOrElse {
           replyQuote(text)

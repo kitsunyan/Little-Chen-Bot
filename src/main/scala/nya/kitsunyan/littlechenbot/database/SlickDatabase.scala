@@ -1,13 +1,13 @@
 package nya.kitsunyan.littlechenbot.database
 
-import info.mukel.telegrambot4s.api.AkkaDefaults
+import info.mukel.telegrambot4s.api._
 
 import java.util.Properties
 
 import scala.concurrent.Future
 import scala.language.implicitConversions
 
-object SlickDatabase extends AkkaDefaults {
+object SlickDatabase extends AkkaDefaults with GlobalExecutionContext {
   import slick.jdbc.SQLiteProfile.api._
 
   private val properties = {
@@ -36,7 +36,7 @@ object SlickDatabase extends AkkaDefaults {
     }
   }
 
-  trait Internal extends AkkaDefaults {
+  trait Internal extends AkkaDefaults with GlobalExecutionContext {
     type ReadResult[T] = DBIOAction[T, NoStream, Effect.Read]
     type WriteResult[T] = DBIOAction[T, NoStream, Effect.Write]
 

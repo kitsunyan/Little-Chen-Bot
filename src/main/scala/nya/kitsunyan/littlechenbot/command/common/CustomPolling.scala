@@ -10,15 +10,15 @@ import akka.stream.scaladsl.Source
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-trait CustomPolling extends BotBase with AkkaImplicits {
+trait CustomPolling extends BotBase with AkkaImplicits with BotExecutionContext {
   private val pollingInterval = 50
   private val sleepInterval = 2000
 
   private val updates: Source[Update, NotUsed] = {
     val seed = Future.successful(0L, Seq.empty[Update])
 
-    val iterator = Iterator.iterate(seed)(_.flatMap { case (offset, updates) =>
-      val maxOffset = updates.map(_.updateId).fold(offset)(_ max _)
+    val iterator = Iterator.iterate(seed)(_.flatMap { case (offset, newUpdates) =>
+      val maxOffset = newUpdates.map(_.updateId).fold(offset)(_ max _)
       request(GetUpdates(Some(maxOffset + 1), timeout = Some(pollingInterval))).recover {
         case NonFatal(e) =>
           logger.error("GetUpdates failed", e)
@@ -42,7 +42,7 @@ trait CustomPolling extends BotBase with AkkaImplicits {
   override def run(): Unit = {
     updates.runForeach { update =>
       try {
-        onUpdate(update)
+        receiveUpdate(update)
       } catch {
         case NonFatal(e) => logger.error("Caught exception in update handler", e)
       }

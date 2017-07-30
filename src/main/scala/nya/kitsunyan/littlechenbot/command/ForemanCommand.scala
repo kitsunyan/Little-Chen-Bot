@@ -3,6 +3,7 @@ package nya.kitsunyan.littlechenbot.command
 import nya.kitsunyan.littlechenbot.command.common._
 
 import info.mukel.telegrambot4s.methods._
+import info.mukel.telegrambot4s.models._
 
 import akka.actor._
 import akka.pattern.ask
@@ -60,7 +61,7 @@ trait ForemanCommand extends Command {
         .map(c => (actor ? CheckCommand(CommandKey(message.initial.chat.id, c))).mapTo[Boolean])
         .map(_.map { shouldReply =>
         if (shouldReply) {
-          request(SendPhoto(Left(message.initial.source), Right(foremanImage),
+          request(SendPhoto(message.initial.source, InputFile(foremanImage),
             replyToMessageId = Some(message.initial.messageId)))
             .recover(handleException(Some(message.initial))(_))
         } else {

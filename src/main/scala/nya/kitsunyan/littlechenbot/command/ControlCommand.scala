@@ -36,7 +36,7 @@ trait ControlCommand extends Command {
         if (message.chat.`type` == ChatType.Private || botOwner.contains(user.id)) {
           Future.unit
         } else {
-          request(GetChatAdministrators(Left(message.chat.id))).map { administrators =>
+          request(GetChatAdministrators(message.chat.id)).map { administrators =>
             if (!administrators.map(_.user.id).contains(user.id)) {
               throw new CommandException(locale.ONLY_ADMINISTRATOR_CAN_DO_IT)
             }
@@ -113,7 +113,7 @@ trait ControlCommand extends Command {
         val targetChat = (targetChatValue.asLong orElse targetChatValue.asString.flatMap(chatForAlias))
           .getOrElse(message.chat.id)
 
-        request(SendMessage(Left(targetChat), arguments("m", "send-message").asString.getOrElse("")))
+        request(SendMessage(targetChat, arguments("m", "send-message").asString.getOrElse("")))
           .flatMap(_ => replyQuote(locale.MESSAGE_SENT)
             .statusMap(Status.Success))
           .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
@@ -131,7 +131,7 @@ trait ControlCommand extends Command {
             }
           }
 
-          messageIdFuture.flatMap(_.map(i => request(DeleteMessage(Left(message.source), i)))
+          messageIdFuture.flatMap(_.map(i => request(DeleteMessage(message.source, i)))
             .getOrElse(throw new CommandException(locale.ARE_YOU_KIDDING_ME)))
         }.statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
@@ -165,7 +165,7 @@ trait ControlCommand extends Command {
           val ownerMessage = s"Permission request:\nChat ID: $chatId\nUsername: $username\n" +
             s"Requester: $requester\nMessage: $requestMessage"
 
-          request(SendMessage(Left(botOwner), ownerMessage))
+          request(SendMessage(botOwner, ownerMessage))
             .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
             .statusMap(Status.Success)
             .recoverWith(handleError(None)(message))
