@@ -144,7 +144,7 @@ object Locale {
     override val CURRENT_CONFIGURATION_FS: String =
       "Current configuration"
     override val DELETE_QUOTED_MESSAGE: String =
-      "Delete quoted message"
+      "Delete quoted message."
     override val DIFFERENT_COMMANDS_FORMAT: String =
       "%s and %s are different commands!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
@@ -202,7 +202,7 @@ object Locale {
     override val IT_WORKS: String =
       "It works!"
     override val LOCALE_INSTALLED: String =
-      "Locale intalled!"
+      "Locale installed!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "List of supported commands"
     override val MESSAGE_SENT: String =
@@ -246,7 +246,7 @@ object Locale {
     override val READY: String =
       "Ready!"
     override val REQUEST_PERMISSION_TO_INTERACT_WITH_BOT: String =
-      "Request permission to interact with bot"
+      "Request permission to interact with bot."
     override val RESET_ALL_DEFAULT_ARGUMENTS_FORMAT: String =
       "Reset all default arguments. Can be used with %s argument only."
     override val RESET_CONFIGURATION_FS: String =
@@ -339,7 +339,7 @@ object Locale {
     override val CURRENT_CONFIGURATION_FS: String =
       "Текущая конфигурация"
     override val DELETE_QUOTED_MESSAGE: String =
-      "Удалить процитированное сообщение"
+      "Удалить процитированное сообщение."
     override val DIFFERENT_COMMANDS_FORMAT: String =
       "%s и %s — разные команды!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
@@ -441,7 +441,7 @@ object Locale {
     override val READY: String =
       "Готово!"
     override val REQUEST_PERMISSION_TO_INTERACT_WITH_BOT: String =
-      "Запросить разрешение на взаимодействие с ботом"
+      "Запросить разрешение на взаимодействие с ботом."
     override val RESET_ALL_DEFAULT_ARGUMENTS_FORMAT: String =
       "Сбросить аргументы по умолчанию. Может быть использовано только с %s."
     override val RESET_CONFIGURATION_FS: String =
