@@ -27,7 +27,8 @@ trait ExtractImage {
       }
     } orElse {
       for {
-        entity <- message.entities.flatMap(_.find(_.`type` == "url"))
+        entities <- message.entities
+        entity <- entities.find(_.`type` == MessageEntityType.Url)
         text <- message.text
         if text.length <= entity.offset + entity.length
         url = text.substring(entity.offset, entity.offset + entity.length)
