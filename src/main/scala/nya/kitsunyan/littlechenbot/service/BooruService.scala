@@ -96,7 +96,7 @@ object BooruService {
       // Two regex because unchanged images have more priority
       (matchOption("<a class=\"original-file-unchanged\" .*?href=\"(.*?)\"".r) orElse
         matchOption("<a class=\"original-file-changed\" .*?href=\"(.*?)\"".r)).map { imageUrl =>
-        val tags = "<li class=\".*?tag-type-(.*?)\" .*?data-name=\"(.*?)\"".r
+        val tags = "<li class=\"tag-type-(.*?)\".*?<a href=\"/post\\?tags=.*?\">(.*?)</a>".r
           .findAllIn(html).matchData.map(_.subgroups).map {
           case (category :: title :: Nil) =>
             Tag(Utils.unescapeHtml(title).replace('_', ' '))(category == "character",
