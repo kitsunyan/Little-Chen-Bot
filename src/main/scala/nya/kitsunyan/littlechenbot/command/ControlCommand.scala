@@ -84,7 +84,7 @@ trait ControlCommand extends Command {
       checkArguments(arguments, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           http("https://gelbooru.com", proxy = true)
-            .runString(HttpFilters.ok)
+            .runString(Http.Filters.ok)
             .flatMap(_ => replyQuote(locale.IT_WORKS))
             .statusMap(Status.Success)
             .recoverWith((e: Throwable) => replyQuote(s"${locale.EVERYTHING_IS_BROKEN}\n${userMessageForException(e)}")

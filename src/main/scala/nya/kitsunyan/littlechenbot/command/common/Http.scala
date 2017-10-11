@@ -16,6 +16,8 @@ import scala.language.implicitConversions
 trait Http {
   this: AkkaImplicits with BotExecutionContext =>
 
+  import Http._
+
   val proxy: Option[java.net.Proxy]
 
   private lazy val client = new OkHttpClient.Builder()
@@ -25,70 +27,8 @@ trait Http {
 
   private lazy val proxyClient = proxy.map(client.newBuilder().proxy(_).build).getOrElse(client)
 
-  case class HttpFilter(filterHeaders: (String, Boolean, HttpExecution) => Unit,
-    maxSize: Option[(Int, (String, Boolean) => Nothing)] = None)
-
-  class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
-    with UserMessageException
-
-  object HttpFilters {
-    def any: HttpFilter = HttpFilter((_, _, _) => ())
-
-    def ok: HttpFilter = code(200)
-
-    def code(validCodes: Int*): HttpFilter = {
-      HttpFilter((url, privateUrl, execution) => {
-        if (!validCodes.contains(execution.code)) {
-          throwResponseCodeExceptionWithPrivateUrl(url, privateUrl, execution.code)
-        }
-      })
-    }
-
-    def contentLength(maxContentLength: Int): HttpFilter = {
-      HttpFilter((url, privateUrl, execution) => {
-        execution.headers("Content-Length")
-          .headOption
-          .map(_.toLong)
-          .find(_ > maxContentLength)
-          .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
-      }, Some(maxContentLength, (url, privateUrl) => throwWithPrivateUrl(url, privateUrl, s"Response is too large")))
-    }
-  }
-
-  private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
-    val publicMessage = s"$commonMessage."
-    val privateMessage = s"$commonMessage $url."
-    throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage)
-  }
-
-  def throwResponseCodeExceptionWithPrivateUrl(url: String, privateUrl: Boolean, responseCode: Int): Nothing = {
-    throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$responseCode]")
-  }
-
-  class ExtendedHttpFilter(filter: HttpFilter) {
-    def &&(anotherFilter: HttpFilter): HttpFilter = {
-      val maxSize = (for {
-        (size, error) <- filter.maxSize
-        (anotherSize, anotherError) <- anotherFilter.maxSize
-      } yield if (size < anotherSize) {
-        (size, error)
-      } else {
-        (anotherSize, anotherError)
-      }) orElse filter.maxSize orElse anotherFilter.maxSize
-
-      HttpFilter((url, privateUrl, execution) => {
-        filter.filterHeaders(url, privateUrl, execution)
-        anotherFilter.filterHeaders(url, privateUrl, execution)
-      }, maxSize)
-    }
-  }
-
-  implicit def extendedHttpFilter(filter: HttpFilter): ExtendedHttpFilter = {
-    new ExtendedHttpFilter(filter)
-  }
-
-  def http(url: String, proxy: Boolean = false): HttpRequest = {
-    new HttpRequest(new Request.Builder().url(url), proxy = proxy)
+  def http(url: String, proxy: Boolean = false): Request = {
+    new Request(new okhttp3.Request.Builder().url(url), proxy = proxy)
       .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
   }
 
@@ -118,40 +58,38 @@ trait Http {
     }
   }
 
-  case class MultipartFile(name: String, filename: String, mimeType: String, data: Array[Byte])
-
-  class HttpRequest(builder: Request.Builder, proxy: Boolean = false, privateUrl: Boolean = false,
+  class Request(builder: okhttp3.Request.Builder, proxy: Boolean = false, privateUrl: Boolean = false,
     multipart: Boolean = false, fields: List[BodyAppend] = Nil) {
-    private def copy(builder: Request.Builder = builder, proxy: Boolean = proxy, privateUrl: Boolean = privateUrl,
-      multipart: Boolean = multipart, fields: List[BodyAppend] = fields): HttpRequest = {
-      new HttpRequest(builder, proxy, privateUrl, multipart, fields)
+    private def copy(builder: okhttp3.Request.Builder = builder, proxy: Boolean = proxy, privateUrl: Boolean = privateUrl,
+      multipart: Boolean = multipart, fields: List[BodyAppend] = fields): Request = {
+      new Request(builder, proxy, privateUrl, multipart, fields)
     }
 
-    def header(nameValue: (String, String)): HttpRequest = {
+    def header(nameValue: (String, String)): Request = {
       nameValue match {
         case (name, value) => copy(builder = builder.header(name, value))
       }
     }
 
-    def withPrivateUrl(privateUrl: Boolean): HttpRequest = {
+    def withPrivateUrl(privateUrl: Boolean): Request = {
       copy(privateUrl = privateUrl)
     }
 
-    def file(multipartFile: MultipartFile): HttpRequest = {
+    def file(multipartFile: MultipartFile): Request = {
       copy(multipart = true, fields = new FileBodyAppend(multipartFile) :: fields)
     }
 
-    def field(field: (String, String)): HttpRequest = {
+    def field(field: (String, String)): Request = {
       fields(List(field))
     }
 
-    def fields(fields: Iterable[(String, String)]): HttpRequest = {
+    def fields(fields: Iterable[(String, String)]): Request = {
       copy(fields = fields.foldLeft(this.fields) { case (fields, (name, value)) =>
         new StringBodyAppend(name, value) :: fields
       })
     }
 
-    private def run[T](filter: HttpFilter, convert: (String, Boolean, ResponseBody) => T,
+    private def run[T](filter: Filter, convert: (String, Boolean, ResponseBody) => T,
       attemptsLeft: Int): Future[HttpResponse[T]] = {
       Future {
         val request = {
@@ -196,15 +134,15 @@ trait Http {
       }
     }
 
-    def runString[R](filter: HttpFilter): Future[HttpResponse[String]] = {
+    def runString[R](filter: Filter): Future[HttpResponse[String]] = {
       run(filter, (_, _, body) => body.string, attemptsForRequest)
     }
 
-    def runBytes[R](filter: HttpFilter): Future[HttpResponse[Array[Byte]]] = {
+    def runBytes[R](filter: Filter): Future[HttpResponse[Array[Byte]]] = {
       run(filter, readBytes(filter), attemptsForRequest)
     }
 
-    private def readBytes(filter: HttpFilter)(url: String, privateUrl: Boolean, body: ResponseBody): Array[Byte] = {
+    private def readBytes(filter: Filter)(url: String, privateUrl: Boolean, body: ResponseBody): Array[Byte] = {
       import okhttp3.internal.Util
 
       val source = body.source
@@ -237,6 +175,72 @@ trait Http {
       }
     }
   }
+}
+
+object Http {
+  case class Filter(filterHeaders: (String, Boolean, HttpExecution) => Unit,
+    maxSize: Option[(Int, (String, Boolean) => Nothing)] = None)
+
+  class ExtendedFilter(filter: Filter) {
+    def &&(anotherFilter: Filter): Filter = {
+      val maxSize = (for {
+        (size, error) <- filter.maxSize
+        (anotherSize, anotherError) <- anotherFilter.maxSize
+      } yield if (size < anotherSize) {
+        (size, error)
+      } else {
+        (anotherSize, anotherError)
+      }) orElse filter.maxSize orElse anotherFilter.maxSize
+
+      Filter((url, privateUrl, execution) => {
+        filter.filterHeaders(url, privateUrl, execution)
+        anotherFilter.filterHeaders(url, privateUrl, execution)
+      }, maxSize)
+    }
+  }
+
+  implicit def extendedHttpFilter(filter: Filter): ExtendedFilter = {
+    new ExtendedFilter(filter)
+  }
+
+  class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
+    with UserMessageException
+
+  object Filters {
+    def any: Filter = Filter((_, _, _) => ())
+
+    def ok: Filter = code(200)
+
+    def code(validCodes: Int*): Filter = {
+      Filter((url, privateUrl, execution) => {
+        if (!validCodes.contains(execution.code)) {
+          throwResponseCodeExceptionWithPrivateUrl(url, privateUrl, execution.code)
+        }
+      })
+    }
+
+    def contentLength(maxContentLength: Int): Filter = {
+      Filter((url, privateUrl, execution) => {
+        execution.headers("Content-Length")
+          .headOption
+          .map(_.toLong)
+          .find(_ > maxContentLength)
+          .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
+      }, Some(maxContentLength, (url, privateUrl) => throwWithPrivateUrl(url, privateUrl, s"Response is too large")))
+    }
+  }
+
+  private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
+    val publicMessage = s"$commonMessage."
+    val privateMessage = s"$commonMessage $url."
+    throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage)
+  }
+
+  def throwResponseCodeExceptionWithPrivateUrl(url: String, privateUrl: Boolean, responseCode: Int): Nothing = {
+    throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$responseCode]")
+  }
+
+  case class MultipartFile(name: String, filename: String, mimeType: String, data: Array[Byte])
 
   class HttpExecution(response: Response) {
     def headers(name: String): List[String] = {

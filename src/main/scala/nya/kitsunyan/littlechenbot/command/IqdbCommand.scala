@@ -30,7 +30,7 @@ trait IqdbCommand extends Command with ExtractImage {
     def sendIqdbRequest(minSimilarity: Int)(typedFile: TypedFile): Future[List[IqdbResult]] = {
       http("https://iqdb.org/")
         .file(typedFile.multipart("file"))
-        .fields(BooruService.list.map("service[]" -> _.iqdbId)).runString(HttpFilters.ok).map { response =>
+        .fields(BooruService.list.map("service[]" -> _.iqdbId)).runString(Http.Filters.ok).map { response =>
         val tablePattern = ("<table><tr><th>(?:Best|Additional|Possible) match</th></tr><tr>.*?" +
           "(?:<img src='(.*?)'.*?)?(?:<td>\\d+×\\d+ \\[(\\w+)\\]</td>.*?)?<td>(\\d+)% similarity</td>.*?</table>").r
         val linkPattern = "<a href=\"(.*?)\">".r
@@ -113,7 +113,7 @@ trait IqdbCommand extends Command with ExtractImage {
         .map(iqdbResult.booruService.replaceDomain(pageUrl, _))
         .getOrElse(pageUrl)
 
-      http(pageUrl, proxy = true).runString(HttpFilters.ok).map { response =>
+      http(pageUrl, proxy = true).runString(Http.Filters.ok).map { response =>
         iqdbResult.booruService.parseHtml(response.body) match {
           case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new CommandException(s"${locale.NOT_PARSED_FS}: $pageUrl.")
@@ -123,7 +123,7 @@ trait IqdbCommand extends Command with ExtractImage {
 
     def readBooruImage(imageData: ImageData): Future[ReadImageData] = {
       http(imageData.url, proxy = true)
-        .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+        .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024))
         .map(response => ReadImageData(Utils.extractNameFromUrl(imageData.url),
           response.body)(imageData.pageUrlFunction, imageData.tags))
     }
@@ -234,7 +234,7 @@ trait IqdbCommand extends Command with ExtractImage {
         previewBlanks.map { previewBlank =>
           previewBlank.url.map { previewUrl =>
             http(previewUrl)
-              .runBytes(HttpFilters.ok)
+              .runBytes(Http.Filters.ok)
               .map(r => Utils.Preview(previewBlank.index, Some(r.body), "image/jpeg", previewBlank.blurMode))
               .recover((handleException(Some(messageWithImage))(_)) ->
                 Utils.Preview(previewBlank.index, None, "", Utils.BlurMode.No))

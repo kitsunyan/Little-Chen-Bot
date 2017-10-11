@@ -14,7 +14,7 @@ object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
   object ShikigamiBot extends TelegramBot with CustomPolling with Http with ForemanCommand with HelpCommand
-    with ControlCommand with PixivCommand with IqdbCommand with RateCommand with GoogleCommand
+    with ControlCommand with PixivCommand with IqdbCommand with RateCommand with ReverseCommand
     with GuessCommand with IdentityCommand {
     override def token: String = configuration.string("bot.token").get
 

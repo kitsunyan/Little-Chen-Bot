@@ -40,7 +40,7 @@ trait RateCommand extends Command with ExtractImage {
       val url = "https://everypixel.com/aesthetics"
 
       http(url)
-        .runString(HttpFilters.ok)
+        .runString(Http.Filters.ok)
         .map(response => "<input .*?id=\"access_token\".*?value=\"(.*?)\".*?/>".r
           .findFirstMatchIn(response.body)
           .flatMap(_.subgroups.headOption)
@@ -50,7 +50,7 @@ trait RateCommand extends Command with ExtractImage {
     def obtainEverypixelTags(typedFile: TypedFile, token: String): Future[List[String]] = {
       http("https://keywording.api.everypixel.com/v1/keywords")
         .header("Authorization", s"Bearer $token")
-        .file(typedFile.multipart("data")).runString(HttpFilters.ok).map { response =>
+        .file(typedFile.multipart("data")).runString(Http.Filters.ok).map { response =>
         import org.json4s._
         import org.json4s.jackson.JsonMethods._
 
@@ -80,7 +80,7 @@ trait RateCommand extends Command with ExtractImage {
     def obtainEverypixelQuality(typedFile: TypedFile, token: String): Future[Float] = {
       http("https://quality.api.everypixel.com/v1/quality")
         .header("Authorization", s"Bearer $token")
-        .file(typedFile.multipart("data")).runString(HttpFilters.ok).map { response =>
+        .file(typedFile.multipart("data")).runString(Http.Filters.ok).map { response =>
         import org.json4s._
         import org.json4s.jackson.JsonMethods._
 

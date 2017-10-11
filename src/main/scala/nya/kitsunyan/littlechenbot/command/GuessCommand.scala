@@ -123,7 +123,7 @@ trait GuessCommand extends Command {
 
     def readBooruImage(url: String): Future[Option[BooruImage]] = {
       http(url, proxy = true)
-        .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+        .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024))
         .map { response =>
         val name = {
           val start = url.lastIndexOf('/') + 1
@@ -195,7 +195,7 @@ trait GuessCommand extends Command {
       val url = "http://gelbooru.com/index.php?page=post&s=list&tags=" +
         java.net.URLEncoder.encode(fullTags.reduce(_ + " " + _), "UTF-8")
 
-      http(url, proxy = true).runString(HttpFilters.ok).flatMap { response =>
+      http(url, proxy = true).runString(Http.Filters.ok).flatMap { response =>
         val maxPage = "<a href=\".*?pid=(\\d+)\">\\d+</a>".r
           .findAllIn(response.body).matchData.map(_.subgroups)
           .map(_.head.toInt).fold(0)(math.max)
@@ -203,7 +203,7 @@ trait GuessCommand extends Command {
 
         val pageUrlsFuture = if (page > 0) {
           http(s"$url&pid=$page", proxy = true)
-            .runString(HttpFilters.ok)
+            .runString(Http.Filters.ok)
             .map(_.body)
             .map(BooruService.Gelbooru.parseListHtml)
         } else {
@@ -236,7 +236,7 @@ trait GuessCommand extends Command {
       def handleResult(pageUrl: String)(result: Result): Future[Result] = {
         if (result.success.isEmpty) {
           http(pageUrl, proxy = true)
-            .runString(HttpFilters.ok)
+            .runString(Http.Filters.ok)
             .map { response =>
               val data = BooruService.Gelbooru.parseHtml(response.body).flatMap { case (url, tags) =>
                 val workTags = tags.filter(t => !exclude.contains(t.title))

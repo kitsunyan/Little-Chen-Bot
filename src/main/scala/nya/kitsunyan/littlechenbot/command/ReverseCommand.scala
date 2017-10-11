@@ -1,6 +1,7 @@
 package nya.kitsunyan.littlechenbot.command
 
 import nya.kitsunyan.littlechenbot.command.common._
+import nya.kitsunyan.littlechenbot.service.ReverseService
 import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.methods._
@@ -8,13 +9,13 @@ import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
-trait GoogleCommand extends Command with ExtractImage {
+trait ReverseCommand extends Command with ExtractImage {
   this: Http =>
 
-  private val commands = List("google")
+  private val commands = List("reverse")
 
   override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
-    super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_GOOGLE_FD) :: list, locale)
+    super.prependDescription(Description(commands, locale.FIND_IMAGE_WITH_REVERSE_FD) :: list, locale)
   }
 
   override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
@@ -22,45 +23,22 @@ trait GoogleCommand extends Command with ExtractImage {
   }
 
   private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
-    def sendGoogleRequest(typedFile: TypedFile): Future[String] = {
-      http("https://images.google.com/searchbyimage/upload")
-        .file(typedFile.multipart("encoded_image"))
-        .field("hl" -> "en")
-        .runString(HttpFilters.ok)
-        .map(_.body)
-    }
-
-    case class Image(url: String, previewUrl: String, width: Option[Int], height: Option[Int])
-
-    def parseImages(response: String): List[Image] = {
-      val result = "<a href=\"(/imgres?.*?)\".*?<img src=\"(https://encrypted-.*?.gstatic.com/.*?)\"".r
-        .findAllMatchIn(response).map(_.subgroups).flatMap {
-        case urlPart :: previewUrl :: Nil =>
-          val parameters = Utils.getUrlParameters(new java.net.URL("https://www.google.com"
-            + Utils.unescapeHtml(urlPart)))
-          for {
-            url <- parameters.get("imgurl").flatten
-            width = parameters.get("w").flatten.map(_.toInt)
-            height = parameters.get("h").flatten.map(_.toInt)
-          } yield Image(url, previewUrl, width, height)
-        case _ => None
-      }.toList.distinct
-
-      if (result.nonEmpty) {
-        def size(image: Image): Int = {
+    def handleImages(images: List[ReverseService.Image]): List[ReverseService.Image] = {
+      if (images.nonEmpty) {
+        def size(image: ReverseService.Image): Int = {
           (for {
             width <- image.width
             height <- image.height
           } yield width * height).getOrElse(0)
         }
 
-        result.sortWith(size(_) > size(_))
+        images.distinct.sortWith(size(_) > size(_))
       } else {
         throw new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")
       }
     }
 
-    def storeResponseToWorkspace(images: List[Image]): Future[(String, List[Image])] = {
+    def storeResponseToWorkspace(images: List[ReverseService.Image]): Future[(String, List[ReverseService.Image])] = {
       import org.json4s.JsonDSL._
       import org.json4s.jackson.JsonMethods._
 
@@ -73,8 +51,8 @@ trait GoogleCommand extends Command with ExtractImage {
       }.getOrElse(Future.failed(new CommandException(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)))
     }
 
-    def replyWithPreview(requestIdString: String, images: List[Image]): Future[Message] = {
-      case class IndexedImage(index: Int, image: Image)
+    def replyWithPreview(requestIdString: String, images: List[ReverseService.Image]): Future[Message] = {
+      case class IndexedImage(index: Int, image: ReverseService.Image)
 
       val (_, indexedImages) = images
         .foldRight[(Int, List[IndexedImage])](images.length, Nil) { case (image, (index, result)) =>
@@ -94,7 +72,7 @@ trait GoogleCommand extends Command with ExtractImage {
       }
 
       indexedImages.map { indexedImage =>
-        http(indexedImage.image.previewUrl).runBytes(HttpFilters.ok).map { response =>
+        http(indexedImage.image.previewUrl).runBytes(Http.Filters.ok).map { response =>
           val mimeType = response.headers("Content-Type").headOption.getOrElse("image/jpeg")
           Utils.Preview(indexedImage.index, Some(response.body), mimeType, Utils.BlurMode.No)
         }.recover((handleException(None)(_)) -> Utils.Preview(indexedImage.index, None, "", Utils.BlurMode.No))
@@ -149,7 +127,7 @@ trait GoogleCommand extends Command with ExtractImage {
           if (nextIndex >= 0) url.substring(0, nextIndex) else url
         }
         http(url, proxy = true).header("Referer", refererUrl)
-          .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+          .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024))
           .map(r => ImageData(url, Utils.extractNameFromUrl(url), r.body))
       }.getOrElse(Future.failed(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")))
     }
@@ -166,7 +144,7 @@ trait GoogleCommand extends Command with ExtractImage {
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan(locale.SEARCH_IMAGE_USING_IMAGES_GOOGLE_COM,
+        replyMan(locale.SEARCH_IMAGE_USING_REVERSE_SEARCH_ENGINES,
           (List("-i", "--index"), Some("integer"),
             locale.FETCH_IMAGE_BY_INDEX) ::
           (List("-d", "--as-document"), None,
@@ -188,11 +166,14 @@ trait GoogleCommand extends Command with ExtractImage {
           .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       }.getOrElse {
+        implicit val http: Http = this
+
         checkArguments(arguments)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)
-            .flatMap(sendGoogleRequest)
-            .map(parseImages)
+            .flatMap(file => ReverseService.list.foldLeft(Future.successful[List[ReverseService.Image]](Nil))
+              ((future, service) => future.flatMap(images => service.getImages(file.multipart).map(images ::: _))))
+            .map(handleImages)
             .flatMap(storeResponseToWorkspace)
             .flatMap((replyWithPreview _).tupled)
             .statusMap(Status.Success))

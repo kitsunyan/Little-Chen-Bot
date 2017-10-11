@@ -46,13 +46,13 @@ trait ExtractImage {
   }
 
   case class TypedFile(data: Array[Byte], mimeType: String) {
-    def multipart(name: String): MultipartFile = MultipartFile(name, "filename", mimeType, data)
+    def multipart(name: String): Http.MultipartFile = Http.MultipartFile(name, "filename", mimeType, data)
   }
 
   private def readExternalFile(file: String, readMeta: Boolean)
     (implicit locale: Locale): Future[Either[TypedFile, String]] = {
     http(file, proxy = true)
-      .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)).map { response =>
+      .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024)).map { response =>
       val contentType = response.headers("Content-Type").headOption.map { contentType =>
         val index = contentType.indexOf(';')
         if (index >= 0) contentType.substring(0, index) else contentType
@@ -88,7 +88,7 @@ trait ExtractImage {
             val telegramImageUrl = s"https://api.telegram.org/file/bot$token/$path"
 
             http(telegramImageUrl).withPrivateUrl(true)
-              .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024)).map { response =>
+              .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024)).map { response =>
               val data = (if (path.endsWith(".webp")) Utils.webpToPng(response.body) else None)
                 .getOrElse(response.body)
 

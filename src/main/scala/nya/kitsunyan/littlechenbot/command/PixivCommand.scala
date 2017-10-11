@@ -31,7 +31,7 @@ trait PixivCommand extends Command with ExtractImage {
     def sendSaucenaoRequest(typedFile: TypedFile): Future[List[Long]] = {
       http("https://saucenao.com/search.php")
         .file(typedFile.multipart("file"))
-        .runString(HttpFilters.ok)
+        .runString(Http.Filters.ok)
         .map(response => "<strong>Pixiv ID: </strong><a .*?>(\\d+)</a>".r
           .findAllMatchIn(response.body)
           .flatMap(_.subgroups.headOption)
@@ -45,7 +45,7 @@ trait PixivCommand extends Command with ExtractImage {
       val mediumPageUrl = s"https://www.pixiv.net/member_illust.php?mode=medium&illust_id=$pixivId"
       val mediumResponse = http(mediumPageUrl)
         .header(HEADER_ACCEPT_LANGUAGE)
-        .runString(HttpFilters.code(200, 403, 404))
+        .runString(Http.Filters.code(200, 403, 404))
 
       case class Response(iterator: Iterator[List[String]], pageUrl: String)
 
@@ -66,7 +66,7 @@ trait PixivCommand extends Command with ExtractImage {
             case Some(s) =>
               throw new PixivException(Some("Invalid response from pixiv.net"), s)
             case _ =>
-              throwResponseCodeExceptionWithPrivateUrl(mediumPageUrl, false, mediumResponse.code)
+              Http.throwResponseCodeExceptionWithPrivateUrl(mediumPageUrl, false, mediumResponse.code)
           }
         } else {
           val imagePattern = "/img/(\\d+/\\d+/\\d+/\\d+/\\d+/\\d+)/(\\d+)_p(\\d+)(\\w*?)\\.\\w+\"".r
@@ -79,7 +79,7 @@ trait PixivCommand extends Command with ExtractImage {
             val mangaPageUrl = s"https://www.pixiv.net/member_illust.php?mode=manga&illust_id=$pixivId"
             val mangaResponse = http(mangaPageUrl)
               .header(HEADER_ACCEPT_LANGUAGE)
-              .runString(HttpFilters.ok)
+              .runString(Http.Filters.ok)
 
             mangaResponse.map(r => Response(extract(r.body), mangaPageUrl))
           } else {
@@ -138,7 +138,7 @@ trait PixivCommand extends Command with ExtractImage {
 
           http(url)
             .header(HEADER_REFERER)
-            .runBytes(HttpFilters.ok && HttpFilters.contentLength(10 * 1024 * 1024))
+            .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024))
             .map(_.body)
             .map(PixivImage(_, url, mimeType))
             .recoverWith((e: Throwable) => readWithExtension(extensions.tail, Some(e)))
