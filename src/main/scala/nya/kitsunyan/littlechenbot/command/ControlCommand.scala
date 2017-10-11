@@ -200,7 +200,7 @@ trait ControlCommand extends Command {
   }
 
   override def handleNotPermittedWarning(implicit message: Message, locale: Locale): Future[Any] = {
-    implicit val argumentsImplicit = Arguments.empty
+    implicit val argumentsImplicit: Arguments = Arguments.empty
 
     replyQuote(locale.YOU_ARE_NOT_PERMITTED_CONTACT_OWNER_FORMAT
       .format("`/chenctl --request-permission \"Your message\"`"), Some(ParseMode.Markdown))

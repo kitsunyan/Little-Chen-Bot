@@ -96,8 +96,8 @@ trait GuessCommand extends Command {
 
   private def handleRunningGame(message: Message, locale: Locale, key: Long)(game: Option[Game]):
     Future[Option[Game]] = {
-    implicit val messageImplicit = message
-    implicit val localeImplicit = locale
+    implicit val messageImplicit: Message = message
+    implicit val localeImplicit: Locale = locale
 
     def parseMessage(game: Game): Boolean = {
       def transformText(text: String): Set[String] = {

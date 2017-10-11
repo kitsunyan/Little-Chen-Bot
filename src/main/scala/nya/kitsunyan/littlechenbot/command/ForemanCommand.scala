@@ -22,7 +22,7 @@ trait ForemanCommand extends Command {
   private case class CheckCommand(key: CommandKey)
 
   private val actor = ActorSystem("ForemanCommand").actorOf(Props(new ForemanActor))
-  private implicit val timeout = Timeout(1, TimeUnit.DAYS)
+  private implicit val timeout: Timeout = Timeout(1, TimeUnit.DAYS)
 
   private class ForemanActor extends Actor {
     val commandMap = new mutable.HashMap[CommandKey, CommandData]
