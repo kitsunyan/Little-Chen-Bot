@@ -119,7 +119,7 @@ trait ReverseCommand extends Command with ExtractImage {
 
     case class ImageData(url: String, name: String, image: Array[Byte])
 
-    def fetchImageByIndex(index: Int)(list: List[String]): Future[ImageData] = {
+    def fetchImageByIndex(index: Int, list: List[String]): Future[ImageData] = {
       list.lift(index - 1).map { url =>
         val refererUrl = {
           val index = url.indexOf("//")
@@ -145,7 +145,7 @@ trait ReverseCommand extends Command with ExtractImage {
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
         replyMan(locale.SEARCH_IMAGE_USING_REVERSE_SEARCH_ENGINES,
-          (List("-i", "--index"), Some("integer"),
+          (List("-i", "--indices"), Some("integer list"),
             locale.FETCH_IMAGE_BY_INDEX) ::
           (List("-d", "--as-document"), None,
             locale.FETCH_IMAGE_AS_DOCUMENT) ::
@@ -155,14 +155,17 @@ trait ReverseCommand extends Command with ExtractImage {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      val indexOption = arguments("i", "index").asInt
+      val indicesOption = arguments("i", "indices").asIntList
       val asDocument = arguments("d", "as-document").nonEmpty
 
-      indexOption.map { index =>
-        checkArguments(arguments, "i", "index", "d", "as-document")
+      indicesOption.map { indices =>
+        checkArguments(arguments, "i", "indices", "d", "as-document")
           .unitFlatMap(extractUrlsListFromWorkspace)
-          .flatMap(fetchImageByIndex(index))
-          .flatMap(replyWithImage(asDocument))
+          .flatMap(list => indices
+            .foldLeft(Future.unit)((f, i) => f
+              .unitFlatMap(fetchImageByIndex(i, list))
+              .flatMap(replyWithImage(asDocument))
+              .map(_ => ())))
           .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       }.getOrElse {

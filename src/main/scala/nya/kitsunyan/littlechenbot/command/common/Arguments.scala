@@ -109,6 +109,17 @@ class Arguments(data: String) {
       }
     }
 
+    def asIntList: Option[List[Int]] = {
+      try {
+        asStringList.map(_.flatMap(v => "^(-?\\d+)-(-?\\d+)".r.findFirstMatchIn(v).map(_.subgroups).flatMap {
+          case start :: end :: Nil => Some(start.toInt to end.toInt)
+          case _ => None
+        }.getOrElse(List(v.toInt))).distinct.sorted)
+      } catch {
+        case _: NumberFormatException => None
+      }
+    }
+
     def asLong: Option[Long] = {
       value.flatMap { value =>
         try {

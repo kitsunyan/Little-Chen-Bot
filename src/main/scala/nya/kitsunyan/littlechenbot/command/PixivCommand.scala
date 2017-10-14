@@ -209,7 +209,7 @@ trait PixivCommand extends Command with ExtractImage {
 
     case class ImageData(url: String, name: String, image: Array[Byte])
 
-    def fetchImageByIndex(index: Int)(list: List[(String, String)]): Future[ImageData] = {
+    def fetchImageByIndex(index: Int, list: List[(String, String)]): Future[ImageData] = {
       list.lift(index - 1).map { case (urlNoExtension, pageUrl) =>
         readPixivImage(urlNoExtension)
           .map(i => ImageData(pageUrl, Utils.extractNameFromUrl(i.url), i.image))
@@ -224,7 +224,7 @@ trait PixivCommand extends Command with ExtractImage {
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
         replyMan(locale.FETCH_IMAGE_FROM_PIXIV_USING_SAUCENAO,
-          (List("-i", "--index"), Some("integer"),
+          (List("-i", "--indices"), Some("integer list"),
             locale.FETCH_IMAGE_BY_INDEX) ::
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
@@ -232,13 +232,16 @@ trait PixivCommand extends Command with ExtractImage {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      val indexOption = arguments("i", "index").asInt
+      val indicesOption = arguments("i", "indices").asIntList
 
-      indexOption.map { index =>
-        checkArguments(arguments, "i", "index", "d", "as-document")
+      indicesOption.map { indices =>
+        checkArguments(arguments, "i", "indices")
           .unitFlatMap(extractUrlsListFromWorkspace)
-          .flatMap(fetchImageByIndex(index))
-          .flatMap(replyWithImage)
+          .flatMap(list => indices
+            .foldLeft(Future.unit)((f, i) => f
+              .unitFlatMap(fetchImageByIndex(i, list))
+              .flatMap(replyWithImage)
+              .map(_ => ())))
           .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       } getOrElse {
