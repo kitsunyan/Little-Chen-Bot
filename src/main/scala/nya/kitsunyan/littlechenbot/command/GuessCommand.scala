@@ -281,9 +281,7 @@ trait GuessCommand extends Command {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      val tags = arguments("t", "tags").asString
-        .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
-        .getOrElse(Nil)
+      val tags = arguments("t", "tags").asStringList.getOrElse(Nil)
 
       checkArguments(arguments, "t", "tags")
         .unitFlatMap(queryImages(tags))

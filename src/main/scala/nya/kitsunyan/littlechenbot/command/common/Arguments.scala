@@ -93,6 +93,12 @@ class Arguments(data: String) {
   class ArgumentValue private[Arguments] (value: Option[String]) {
     def asString: Option[String] = value
 
+    def asStringList: Option[List[String]] = asStringList(",|\\s+")
+
+    def asStringList(splitRegex: String): Option[List[String]] = {
+      value.map(_.split(splitRegex).toList).filterNot(_.isEmpty)
+    }
+
     def asInt: Option[Int] = {
       value.flatMap { value =>
         try {

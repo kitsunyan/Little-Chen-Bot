@@ -328,8 +328,7 @@ trait IqdbCommand extends Command with ExtractImage {
     val similarityOption = arguments("s", "min-similarity").asInt
       .map(s => if (s > 100) 100 else if (s < 0) 0 else s)
 
-    val priorityOption = arguments("p", "priority").asString
-      .map(_.split(",|\\s+").toList.filter(!_.isEmpty))
+    val priorityOption = arguments("p", "priority").asStringList
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
