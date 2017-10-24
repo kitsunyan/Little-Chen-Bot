@@ -128,7 +128,7 @@ trait ReverseCommand extends Command with ExtractImage {
         }
         http(url, proxy = true).header("Referer", refererUrl)
           .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024))
-          .map(r => ImageData(url, Utils.extractNameFromUrl(url), r.body))
+          .map(r => ImageData(url, Utils.extractNameFromUrl(url, None), r.body))
       }.getOrElse(Future.failed(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")))
     }
 

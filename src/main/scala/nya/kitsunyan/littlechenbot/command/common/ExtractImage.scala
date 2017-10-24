@@ -45,7 +45,12 @@ trait ExtractImage {
     }
   }
 
-  case class TypedFile(data: Array[Byte], mimeType: String) {
+  private def formatFileName(name: String, mimeType: Option[String]): String = {
+    val extension = mimeType.flatMap(Utils.mimeTypeMap.lift).getOrElse("jpeg")
+    s"$name.$extension"
+  }
+
+  case class TypedFile(data: Array[Byte], mimeType: String, name: String) {
     def multipart(name: String): Http.MultipartFile = Http.MultipartFile(name, "filename", mimeType, data)
   }
 
@@ -61,10 +66,11 @@ trait ExtractImage {
       def unable: Nothing = throw new CommandException(locale.UNABLE_TO_FETCH_THE_FILE_BY_URL)
 
       contentType match {
-        case Some(mimeType) if mimeType.startsWith("image/") => Left(TypedFile(response.body, mimeType))
+        case Some(mimeType) if mimeType.startsWith("image/") =>
+          Left(TypedFile(response.body, mimeType, Utils.extractNameFromUrl(file, Some(mimeType))))
         case Some("text/html") if readMeta =>
           val responseString = new String(response.body, "ISO-8859-1")
-          "<meta property=\"og:image\" content=\"(.*?)\".*?>".r
+          "<meta\\s+property=\"og:image\"\\s+content=\"(.*?)\".*?>".r
             .findFirstMatchIn(responseString)
             .flatMap(_.subgroups.headOption)
             .filter(url => url.startsWith("http://") || url.startsWith("https://"))
@@ -98,7 +104,7 @@ trait ExtractImage {
                 "image/png"
               }
 
-              TypedFile(data, mimeType)
+              TypedFile(data, mimeType, formatFileName(file.fileId, Some(mimeType)))
             }
           case None => Future.failed(new CommandException(locale.UNABLE_TO_FETCH_TELEGRAM_FILE))
         }

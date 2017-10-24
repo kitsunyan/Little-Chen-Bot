@@ -32,6 +32,7 @@ sealed trait Locale {
   val FETCH_FROM_DANBOORU_OR_GELBOORU_IF_POSSIBLE_FS: String
   val FETCH_FROM_DANBOORU_WITH_SIMILARITY_50_FS: String
   val FETCH_IMAGE_AS_DOCUMENT: String
+  val FETCH_IMAGE_AS_DOCUMENT_FD: String
   val FETCH_IMAGE_BY_INDEX_FS: String
   val FETCH_IMAGE_BY_INDEX: String
   val FETCH_IMAGE_BY_SPECIFIED_INDEX: String
@@ -166,6 +167,8 @@ object Locale {
       "Fetch first image from danbooru with similarity >= 50%"
     override val FETCH_IMAGE_AS_DOCUMENT: String =
       "Fetch image as document in original quality."
+    override val FETCH_IMAGE_AS_DOCUMENT_FD: String =
+      "fetch image as document in original quality"
     override val FETCH_IMAGE_BY_INDEX_FS: String =
       "Fetch image by index"
     override val FETCH_IMAGE_BY_INDEX: String =
@@ -363,6 +366,8 @@ object Locale {
       "Получить первую картинку с danbooru со сходством >= 50%"
     override val FETCH_IMAGE_AS_DOCUMENT: String =
       "Получить картинку в виде документа в исходном качестве."
+    override val FETCH_IMAGE_AS_DOCUMENT_FD: String =
+      "получить картинку в виде документа в исходном качестве"
     override val FETCH_IMAGE_BY_INDEX_FS: String =
       "Получить картинку по номеру"
     override val FETCH_IMAGE_BY_INDEX: String =

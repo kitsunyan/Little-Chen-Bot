@@ -36,16 +36,22 @@ object Utils {
     case object Hard extends BlurMode("#ff6688")
   }
 
+  val (mimeTypeMap, extensionMap) = {
+    val list =
+      "png" -> "image/png" ::
+      "jpg" -> "image/jpeg" ::
+      "jpeg" -> "image/jpeg" ::
+      "gif" -> "image/gif" ::
+      "webp" -> "image/webp" ::
+      Nil
+
+    (list.map {
+      case (extension, mimeType) => mimeType -> extension
+    }.toMap, list.toMap)
+  }
+
   case class Preview(index: Int, image: Option[Array[Byte]], mimeType: String, blurMode: BlurMode) {
-    def extension: Option[String] = {
-      mimeType match {
-        case "image/jpeg" => Some("jpg")
-        case "image/png" => Some("png")
-        case "image/gif" => Some("gif")
-        case "image/webp" => Some("webp")
-        case _ => None
-      }
-    }
+    def extension: Option[String] = mimeTypeMap.lift(mimeType)
   }
 
   def drawPreview(previews: List[Preview]): Option[Array[Byte]] = {
@@ -166,11 +172,26 @@ object Utils {
     }.toMap
   }
 
-  def extractNameFromUrl(url: String): String = {
+  def extractNameFromUrl(url: String, mimeType: Option[String]): String = {
     val start = url.lastIndexOf('/') + 1
     val end = url.indexOf('?', start)
-    val name = if (end >= start) url.substring(start, end) else url.substring(start)
-    java.net.URLDecoder.decode(name, "UTF-8")
+    val encodedName = if (end >= start) url.substring(start, end) else url.substring(start)
+    val decodedName = java.net.URLDecoder.decode(encodedName, "UTF-8")
+
+    val colon = decodedName.lastIndexOf(':')
+    val dot = decodedName.lastIndexOf('.')
+    val truncatedName = if (colon > dot && dot >= 0) decodedName.substring(0, colon) else decodedName
+    val extension = if (dot >= 0) Some(truncatedName.substring(dot + 1)) else None
+
+    val urlMimeType = extension.flatMap(extensionMap.lift)
+
+    if (mimeType.nonEmpty && urlMimeType != mimeType) {
+      val newName = decodedName.substring(0, dot)
+      val extension = mimeType.flatMap(mimeTypeMap.lift).getOrElse("jpeg")
+      s"$newName.$extension"
+    } else {
+      truncatedName
+    }
   }
 
   private def schemeBoolean(https: Boolean): String = {

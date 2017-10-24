@@ -147,8 +147,7 @@ trait PixivCommand extends Command with ExtractImage {
         }
       }
 
-      readWithExtension(List("png" -> "image/png", "jpg" -> "image/jpeg",
-        "jpeg" -> "image/jpeg", "gif" -> "image/gid"), None)
+      readWithExtension(Utils.extensionMap.toList, None)
     }
 
     def replyWithPreview(requestIdString: String, pixivResults: List[PixivResult]): Future[Message] = {
@@ -212,7 +211,7 @@ trait PixivCommand extends Command with ExtractImage {
     def fetchImageByIndex(index: Int, list: List[(String, String)]): Future[ImageData] = {
       list.lift(index - 1).map { case (urlNoExtension, pageUrl) =>
         readPixivImage(urlNoExtension)
-          .map(i => ImageData(pageUrl, Utils.extractNameFromUrl(i.url), i.image))
+          .map(i => ImageData(pageUrl, Utils.extractNameFromUrl(i.url, None), i.image))
       }.getOrElse(Future.failed(new CommandException(s"${locale.NO_IMAGES_FOUND_FS}.")))
     }
 
