@@ -221,14 +221,14 @@ trait Command extends BotBase with AkkaDefaults with GlobalExecutionContext {
   }
 
   object WorkspaceRequest {
-    def apply(command: String)(id: Long): String = {
+    def apply(command: String)(id: Int): String = {
       s"[request:$command:$id]"
     }
 
-    def parse(command: String)(message: String)(implicit locale: Locale): Option[Long] = {
+    def parse(command: String)(message: String)(implicit locale: Locale): Option[Int] = {
       "\\[request:(\\w+?):(-?\\d+)\\]".r.findFirstMatchIn(message)
         .map(_.subgroups)
-        .map(g => (g(0), g(1).toLong))
+        .map(g => (g(0), g(1).toInt))
         .map { case (parsedCommand, id) =>
         if (parsedCommand == command) {
           id

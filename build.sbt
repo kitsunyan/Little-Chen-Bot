@@ -15,12 +15,12 @@ scalacOptions :=
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies ++=
-  "info.mukel" %% "telegrambot4s" % "3.0.4" ::
+  "info.mukel" %% "telegrambot4s" % "3.0.14" ::
   "org.slf4j" % "slf4j-simple" % "1.7.25" ::
   "org.json4s" %% "json4s-jackson" % "3.5.3" ::
-  "org.xerial" % "sqlite-jdbc" % "3.19.3" ::
+  "org.xerial" % "sqlite-jdbc" % "3.20.0" ::
   "com.typesafe.slick" %% "slick" % "3.2.1" ::
-  "com.squareup.okhttp3" % "okhttp" % "3.8.1" ::
+  "com.squareup.okhttp3" % "okhttp" % "3.9.0" ::
   Nil
 
 lazy val config = {
