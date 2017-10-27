@@ -115,7 +115,7 @@ trait IqdbCommand extends Command with ExtractImage {
 
       http(pageUrl, proxy = true).runString(Http.Filters.ok).map { response =>
         iqdbResult.booruService.parseHtml(response.body) match {
-          case Some((url, tags)) => ImageData(url)(pageUrlFunction, tags)
+          case Some(BooruService.Image(url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new CommandException(s"${locale.NOT_PARSED_FS}: $pageUrl.")
         }
       }

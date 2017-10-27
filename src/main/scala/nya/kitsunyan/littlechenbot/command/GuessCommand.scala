@@ -42,7 +42,7 @@ trait GuessCommand extends Command {
   private case object CleanupInstances
 
   private val actor = ActorSystem("GuessCommand").actorOf(Props(new GuessActor))
-  private implicit val timeout = Timeout(1, TimeUnit.DAYS)
+  private implicit val timeout: Timeout = Timeout(1, TimeUnit.DAYS)
 
   private class GuessActor extends Actor {
     private val instances = mutable.HashMap[Long, Instance]()
@@ -238,10 +238,10 @@ trait GuessCommand extends Command {
           http(pageUrl, proxy = true)
             .runString(Http.Filters.ok)
             .map { response =>
-              val data = BooruService.Gelbooru.parseHtml(response.body).flatMap { case (url, tags) =>
-                val workTags = tags.filter(t => !exclude.contains(t.title))
+              val data = BooruService.Gelbooru.parseHtml(response.body).flatMap { image =>
+                val workTags = image.tags.filter(t => !exclude.contains(t.title))
                 if (workTags.exists(_.character) && workTags.exists(_.other)) {
-                  Some(Image(url, pageUrl, workTags))
+                  Some(Image(image.url, pageUrl, workTags))
                 } else {
                   None
                 }

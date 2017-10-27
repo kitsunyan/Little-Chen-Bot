@@ -10,7 +10,7 @@ sealed trait BooruService {
   val iqdbId: String
   val aliases: List[Alias]
   def filterUrl(url: String): Boolean
-  def parseHtml(html: String): Option[(String, List[Tag])]
+  def parseHtml(html: String): Option[Image]
 
   protected def collectSet(content: String, regex: Regex): Set[String] = {
     regex.findAllIn(content).matchData.map(_.subgroups.head).toSet
@@ -38,10 +38,12 @@ object BooruService {
     def other: Boolean = !character && !copyright && !artist
   }
 
+  case class Image(url: String, tags: List[Tag])
+
   case class Alias(name: String, primaryName: Boolean = false,
     primaryDomain: Boolean = false, replaceDomain: Boolean = false)
 
-  val list: List[BooruService] = List(Danbooru, Yandere, Gelbooru)
+  val list: List[BooruService] = List(Danbooru, Yandere, Gelbooru, Sankaku)
 
   def findByUrl(url: String): Option[BooruService] = {
     list.find(_.filterUrl(url))
@@ -62,19 +64,19 @@ object BooruService {
 
     override def filterUrl(url: String): Boolean = url.contains("//danbooru.donmai.us")
 
-    override def parseHtml(html: String): Option[(String, List[Tag])] = {
+    override def parseHtml(html: String): Option[Image] = {
       "data-file-url=\"(.*?)\"".r.findAllIn(html).matchData.map(_.subgroups.head).toList match {
         case _ :+ imageUrl =>
           val url = Utils.appendSchemeHost(true, "danbooru.donmai.us")(imageUrl)
 
           val tags = "<li class=\"category-(\\d+)\">.*?<a .*?class=\"search-.*?>(.*?)</a>".r
             .findAllIn(html).matchData.map(_.subgroups).map {
-            case (category :: title :: Nil) =>
+            case category :: title :: Nil =>
               Tag(Utils.unescapeHtml(title))(category == "4", category == "3", category == "1")
             case e => throw new MatchError(e)
           }.toList.distinct
 
-          Some(url, tags)
+          Some(Image(url, tags))
         case _ => None
       }
     }
@@ -90,7 +92,7 @@ object BooruService {
 
     override def filterUrl(url: String): Boolean = url.contains("//yande.re")
 
-    override def parseHtml(html: String): Option[(String, List[Tag])] = {
+    override def parseHtml(html: String): Option[Image] = {
       def matchOption(r: Regex): Option[String] = r.findAllIn(html).matchData.map(_.subgroups.head).toList.headOption
 
       // Two regex because unchanged images have more priority
@@ -98,13 +100,13 @@ object BooruService {
         matchOption("<a class=\"original-file-changed\" .*?href=\"(.*?)\"".r)).map { imageUrl =>
         val tags = "<li class=\"tag-type-(.*?)\".*?<a href=\"/post\\?tags=.*?\">(.*?)</a>".r
           .findAllIn(html).matchData.map(_.subgroups).map {
-          case (category :: title :: Nil) =>
+          case category :: title :: Nil =>
             Tag(Utils.unescapeHtml(title).replace('_', ' '))(category == "character",
               category == "copyright", category == "artist")
           case e => throw new MatchError(e)
         }.toList.distinct
 
-        (imageUrl, tags)
+        Image(imageUrl, tags)
       }
     }
   }
@@ -119,25 +121,26 @@ object BooruService {
 
     override def filterUrl(url: String): Boolean = url.contains("//gelbooru.com")
 
-    override def parseHtml(html: String): Option[(String, List[Tag])] = {
+    override def parseHtml(html: String): Option[Image] = {
       "(?s)<!\\[CDATA\\[.*?(.*?)\\};.*?//\\]\\]>".r.findFirstMatchIn(html).flatMap { m =>
         val map = "'(.*?)': ?(?:'(.*?)'|(\\w+))".r.findAllIn(m.subgroups.head).matchData.map { data =>
           data.subgroups.head -> data.subgroups.tail
         }.map { case (key, values) =>
           if (values.head != null) (key, values.head) else (key, values.last)
         }.toMap
+
         try {
           val url = Utils.appendSchemeHost(true, "gelbooru.com")
             .apply(map("domain") + "/" + map("base_dir") + "/" + map("dir") + "/" + map("img"))
 
           val tags = "<li class=\"tag-type-(.*?)\"><a .*?page=post.*?>(.*?)</a>".r
             .findAllIn(html).matchData.map(_.subgroups).map {
-            case (category :: title :: Nil) =>
+            case category :: title :: Nil =>
               Tag(Utils.unescapeHtml(title))(category == "character", category == "copyright", category == "artist")
             case e => throw new MatchError(e)
           }.toList.distinct
 
-          Some(url, tags)
+          Some(Image(url, tags))
         } catch {
           case _: NoSuchElementException => None
         }
@@ -160,6 +163,30 @@ object BooruService {
         case e =>
           throw new MatchError(e)
       }.toList
+    }
+  }
+
+  object Sankaku extends BooruService {
+    override val iqdbId: String = "5"
+
+    override val aliases: List[Alias] =
+      Alias("sankaku", primaryName = true) ::
+      Alias("chan.sankakucomplex.com", primaryDomain = true) ::
+      Nil
+
+    override def filterUrl(url: String): Boolean = url.contains("//chan.sankakucomplex.com")
+
+    override def parseHtml(html: String): Option[Image] = {
+      "<li>Original: <a href=\"(.*?)\"".r.findFirstMatchIn(html).flatMap(_.subgroups.headOption)
+        .map(_.replace("&amp;", "&")).map(Utils.appendSchemeHost(true, "chan.sankakucomplex.com")).map { url =>
+        val tags = "<li class=\"?tag-type-(.*?)\"?><a .*?>(.*?)</a>".r.findAllMatchIn(html).map(_.subgroups).map {
+          case category :: title :: Nil =>
+            Tag(Utils.unescapeHtml(title))(category == "character", category == "copyright", category == "artist")
+          case e => throw new MatchError(e)
+        }.toList.distinct
+
+        Image(url, tags)
+      }
     }
   }
 }
