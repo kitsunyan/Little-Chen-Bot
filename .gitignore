@@ -1,0 +1,9 @@
+/*
+!/src
+!/project
+/project/project
+/project/target
+!/.gitignore
+!/build.sbt
+!/LICENSE
+!/README.md
