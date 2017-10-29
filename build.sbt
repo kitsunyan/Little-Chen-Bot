@@ -12,6 +12,8 @@ scalacOptions :=
   "-feature" ::
   Nil
 
+scalaSource in Compile := baseDirectory.value / "src"
+
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies ++=
