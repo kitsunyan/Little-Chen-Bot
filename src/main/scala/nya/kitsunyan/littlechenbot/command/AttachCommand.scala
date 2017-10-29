@@ -8,13 +8,13 @@ import info.mukel.telegrambot4s.models._
 
 import scala.concurrent.Future
 
-trait DocumentCommand extends Command with ExtractImage {
+trait AttachCommand extends Command with ExtractImage {
   this: Http =>
 
-  private val commands = List("document")
+  private val commands = List("attach")
 
   override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
-    super.prependDescription(Description(commands, locale.FETCH_IMAGE_AS_DOCUMENT_FD) :: list, locale)
+    super.prependDescription(Description(commands, locale.FETCH_IMAGE_AND_ATTACH_FD) :: list, locale)
   }
 
   override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
@@ -22,24 +22,33 @@ trait DocumentCommand extends Command with ExtractImage {
   }
 
   private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
-    def replyWithImage(typedFile: TypedFile): Future[Message] = {
-      request(SendDocument(message.source, InputFile(typedFile.name, typedFile.data),
-        replyToMessageId = Some(message.messageId)))
+    def replyWithImage(asDocument: Boolean)(typedFile: TypedFile): Future[Message] = {
+      if (asDocument) {
+        request(SendDocument(message.source, InputFile(typedFile.name, typedFile.data),
+          replyToMessageId = Some(message.messageId)))
+      } else {
+        request(SendPhoto(message.source, InputFile(typedFile.name, typedFile.data),
+          replyToMessageId = Some(message.messageId)))
+      }
     }
 
     if (arguments("h", "help").nonEmpty) {
       checkArguments(arguments, "h", "help").unitFlatMap {
-        replyMan(locale.FETCH_IMAGE_AS_DOCUMENT,
+        replyMan(locale.DOWNLOAD_AND_ATTACH_IMAGE,
+          (List("-d", "--as-document"), None,
+            locale.FETCH_IMAGE_AS_DOCUMENT) ::
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      checkArguments(arguments)
+      val asDocument = arguments("d", "as-document").nonEmpty
+
+      checkArguments(arguments, "d", "as-document")
         .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
-          .flatMap(replyWithImage)
+          .flatMap(replyWithImage(asDocument))
           .statusMap(Status.Success))
         .recoverWith(message)(handleError(Some(locale.IMAGE_REQUEST_FV_FS)))
     }

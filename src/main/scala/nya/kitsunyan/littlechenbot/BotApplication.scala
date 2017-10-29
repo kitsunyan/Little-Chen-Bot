@@ -15,7 +15,7 @@ object BotApplication extends App {
 
   object ShikigamiBot extends TelegramBot with CustomPolling with Http with ForemanCommand with HelpCommand
     with ControlCommand with PixivCommand with IqdbCommand with RateCommand with ReverseCommand
-    with DocumentCommand with GuessCommand with IdentityCommand {
+    with AttachCommand with GuessCommand with IdentityCommand {
     override def token: String = configuration.string("bot.token").get
 
     override val workspace: Option[Long] = configuration.long("bot.workspace")

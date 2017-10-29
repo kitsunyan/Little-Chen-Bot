@@ -26,13 +26,14 @@ sealed trait Locale {
   val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String
   val DISPLAY_THIS_HELP_FD: String
   val DISPLAY_THIS_HELP: String
+  val DOWNLOAD_AND_ATTACH_IMAGE: String
   val EVERYTHING_IS_BROKEN: String
   val EXAMPLES_OF_USAGE_FS: String
   val FETCH_FROM_DANBOORU_IF_POSSIBLE_FS: String
   val FETCH_FROM_DANBOORU_OR_GELBOORU_IF_POSSIBLE_FS: String
   val FETCH_FROM_DANBOORU_WITH_SIMILARITY_50_FS: String
+  val FETCH_IMAGE_AND_ATTACH_FD: String
   val FETCH_IMAGE_AS_DOCUMENT: String
-  val FETCH_IMAGE_AS_DOCUMENT_FD: String
   val FETCH_IMAGE_BY_INDEX_FS: String
   val FETCH_IMAGE_BY_INDEX: String
   val FETCH_IMAGE_BY_SPECIFIED_INDEX: String
@@ -151,6 +152,9 @@ object Locale {
       "%s and %s are different commands!"
     override val DISPLAY_LIST_OF_SUPPORTED_COMMANDS: String =
       "Display list of supported commands."
+    override val DOWNLOAD_AND_ATTACH_IMAGE: String =
+      "Download and attach remote image. " +
+      "Useful when you want to convert document to image or download image by URL."
     override val DISPLAY_THIS_HELP_FD: String =
       "display this help"
     override val DISPLAY_THIS_HELP: String =
@@ -165,10 +169,10 @@ object Locale {
       "Fetch first image from danbooru or gelbooru if possible"
     override val FETCH_FROM_DANBOORU_WITH_SIMILARITY_50_FS: String =
       "Fetch first image from danbooru with similarity >= 50%"
+    override val FETCH_IMAGE_AND_ATTACH_FD: String =
+      "fetch image and attach it to message"
     override val FETCH_IMAGE_AS_DOCUMENT: String =
       "Fetch image as document in original quality."
-    override val FETCH_IMAGE_AS_DOCUMENT_FD: String =
-      "fetch image as document in original quality"
     override val FETCH_IMAGE_BY_INDEX_FS: String =
       "Fetch image by index"
     override val FETCH_IMAGE_BY_INDEX: String =
@@ -354,6 +358,9 @@ object Locale {
       "показать эту справку"
     override val DISPLAY_THIS_HELP: String =
       "Показать эту справку."
+    override val DOWNLOAD_AND_ATTACH_IMAGE: String =
+      "Загрузка и прикрепление картинки. " +
+      "Позволяет сконвертировать документ в картинку или загрузить картинку по ссылке."
     override val EVERYTHING_IS_BROKEN: String =
       "Всё сломано!"
     override val EXAMPLES_OF_USAGE_FS: String =
@@ -364,10 +371,10 @@ object Locale {
       "Получить первую картинку с danbooru или gelbooru если возможно"
     override val FETCH_FROM_DANBOORU_WITH_SIMILARITY_50_FS: String =
       "Получить первую картинку с danbooru со сходством >= 50%"
+    override val FETCH_IMAGE_AND_ATTACH_FD: String =
+      "получить картинку и прикрепить к сообщению"
     override val FETCH_IMAGE_AS_DOCUMENT: String =
       "Получить картинку в виде документа в исходном качестве."
-    override val FETCH_IMAGE_AS_DOCUMENT_FD: String =
-      "получить картинку в виде документа в исходном качестве"
     override val FETCH_IMAGE_BY_INDEX_FS: String =
       "Получить картинку по номеру"
     override val FETCH_IMAGE_BY_INDEX: String =
