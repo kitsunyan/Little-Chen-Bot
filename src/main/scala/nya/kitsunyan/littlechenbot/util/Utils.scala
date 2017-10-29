@@ -186,7 +186,7 @@ object Utils {
     val urlMimeType = extension.flatMap(extensionMap.lift)
 
     if (mimeType.nonEmpty && urlMimeType != mimeType) {
-      val newName = decodedName.substring(0, dot)
+      val newName = if (dot >= 0) truncatedName.substring(0, dot) else truncatedName
       val extension = mimeType.flatMap(mimeTypeMap.lift).getOrElse("jpeg")
       s"$newName.$extension"
     } else {
