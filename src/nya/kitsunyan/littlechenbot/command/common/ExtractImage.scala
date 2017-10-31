@@ -30,7 +30,7 @@ trait ExtractImage {
         entities <- message.entities
         entity <- entities.find(_.`type` == MessageEntityType.Url)
         text <- message.text
-        if text.length <= entity.offset + entity.length
+        if text.length >= entity.offset + entity.length
         url = text.substring(entity.offset, entity.offset + entity.length)
         if url.startsWith("http://") || url.startsWith("https://")
       } yield url
