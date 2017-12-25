@@ -20,6 +20,8 @@ trait Http {
 
   val proxy: Option[java.net.Proxy]
 
+  val proxyWhitelist: Set[String]
+
   private lazy val client = new OkHttpClient.Builder()
     .connectTimeout(10000, TimeUnit.MILLISECONDS)
     .readTimeout(10000, TimeUnit.MILLISECONDS)
@@ -28,7 +30,10 @@ trait Http {
   private lazy val proxyClient = proxy.map(client.newBuilder().proxy(_).build).getOrElse(client)
 
   def http(url: String, proxy: Boolean = false): Request = {
-    new Request(new okhttp3.Request.Builder().url(url), proxy = proxy)
+    val httpUrl = HttpUrl.parse(url)
+    val realProxy = proxy && !proxyWhitelist.contains(httpUrl.host)
+
+    new Request(new okhttp3.Request.Builder().url(httpUrl), proxy = realProxy)
       .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0")
   }
 
@@ -60,8 +65,8 @@ trait Http {
 
   class Request(builder: okhttp3.Request.Builder, proxy: Boolean = false, privateUrl: Boolean = false,
     multipart: Boolean = false, fields: List[BodyAppend] = Nil) {
-    private def copy(builder: okhttp3.Request.Builder = builder, proxy: Boolean = proxy, privateUrl: Boolean = privateUrl,
-      multipart: Boolean = multipart, fields: List[BodyAppend] = fields): Request = {
+    private def copy(builder: okhttp3.Request.Builder = builder, proxy: Boolean = proxy,
+      privateUrl: Boolean = privateUrl, multipart: Boolean = multipart, fields: List[BodyAppend] = fields): Request = {
       new Request(builder, proxy, privateUrl, multipart, fields)
     }
 

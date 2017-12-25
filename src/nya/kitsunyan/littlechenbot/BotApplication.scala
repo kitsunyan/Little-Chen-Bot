@@ -47,6 +47,8 @@ object BotApplication extends App {
 
     override val restartProxyCommand: Option[Seq[String]] = configuration.stringList("bot.proxy.restart")
 
+    override val proxyWhitelist: Set[String] = configuration.stringList("bot.proxy.whitelist").getOrElse(Nil).toSet
+
     override def chatForAlias(alias: String): Option[Long] = {
       chats.find(_.alias.contains(alias)).map(_.id)
     }
