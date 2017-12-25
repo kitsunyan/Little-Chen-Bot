@@ -113,7 +113,7 @@ trait IqdbCommand extends Command with ExtractImage {
         .map(iqdbResult.booruService.replaceDomain(pageUrl, _))
         .getOrElse(pageUrl)
 
-      http(pageUrl, proxy = true).runString(Http.Filters.ok).map { response =>
+      http(pageUrl).runString(Http.Filters.ok).map { response =>
         iqdbResult.booruService.parseHtml(response.body) match {
           case Some(BooruService.Image(url, tags)) => ImageData(url)(pageUrlFunction, tags)
           case None => throw new CommandException(s"${locale.NOT_PARSED_FS}: $pageUrl.")
@@ -122,7 +122,7 @@ trait IqdbCommand extends Command with ExtractImage {
     }
 
     def readBooruImage(imageData: ImageData): Future[ReadImageData] = {
-      http(imageData.url, proxy = true)
+      http(imageData.url)
         .runBytes(Http.Filters.ok && Http.Filters.contentLength(10 * 1024 * 1024))
         .map(response => ReadImageData(Utils.extractNameFromUrl(imageData.url, None),
           response.body)(imageData.pageUrlFunction, imageData.tags))
