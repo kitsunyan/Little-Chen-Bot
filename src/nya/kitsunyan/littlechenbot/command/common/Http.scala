@@ -22,6 +22,8 @@ trait Http {
 
   val proxyWhitelist: Set[String]
 
+  implicit val httpInstance: Http = this
+
   private lazy val client = new OkHttpClient.Builder()
     .connectTimeout(10000, TimeUnit.MILLISECONDS)
     .readTimeout(10000, TimeUnit.MILLISECONDS)

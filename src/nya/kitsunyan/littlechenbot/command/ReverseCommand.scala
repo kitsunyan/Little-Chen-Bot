@@ -169,8 +169,6 @@ trait ReverseCommand extends Command with ExtractImage {
           .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       }.getOrElse {
-        implicit val http: Http = this
-
         checkArguments(arguments)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)

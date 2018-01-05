@@ -47,7 +47,7 @@ trait GuessCommand extends Command {
   private class GuessActor extends Actor {
     private val instances = mutable.HashMap[Long, Instance]()
 
-    def receive: PartialFunction[Any, Unit] = {
+    def receive: Receive = {
       case CreateGame(messageId, game, locale) =>
         instances += messageId -> Instance(Future.successful(Some(game)), Set(messageId),
           System.currentTimeMillis, locale)

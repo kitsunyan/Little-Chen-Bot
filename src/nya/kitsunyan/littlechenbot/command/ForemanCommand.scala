@@ -27,7 +27,7 @@ trait ForemanCommand extends Command {
   private class ForemanActor extends Actor {
     val commandMap = new mutable.HashMap[CommandKey, CommandData]
 
-    def receive: PartialFunction[Any, Unit] = {
+    def receive: Receive = {
       case CheckCommand(commandKey) =>
         val time = System.currentTimeMillis
         val commandData = commandMap
