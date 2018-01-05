@@ -13,8 +13,10 @@ sealed trait Locale {
   val A_SMALL_GAME_IN_GUESSING_A_CHARACTER: String
   val A_WINNER_IS_YOU: String
   val ATTACH_A_COMPLETE_LIST_OF_TAGS_TO_REPLY: String
+  val BAKA_FD: String
   val BOT_CONTROL_AND_ADMINISTRATION: String
   val BOT_CONTROL_FD: String
+  val CHAOMIAN_BAKA: String
   val CHARACTERS_FS: String
   val CHECK_PROXY_AVAILABLE: String
   val CONFIGURATION_HANDLING_FV_FS: String
@@ -49,6 +51,7 @@ sealed trait Locale {
   val I_DONT_KNOW_HOW: String
   val IMAGE_REQUEST_FV_FS: String
   val INVALID_ARGUMENT_FS: String
+  val INVALID_LANGUAGE: String
   val INVALID_LOCALE_LIST_FORMAT: String
   val INVALID_SERVER_RESPONSE: String
   val IT_WORKS: String
@@ -91,6 +94,7 @@ sealed trait Locale {
   val SUPPORTED_BOORU_SERVICES_FS: String
   val TAGS_FS: String
   val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String
+  val TRANSLATION_REQUEST_FV_FS: String
   val UNABLE_TO_FETCH_TELEGRAM_FILE: String
   val UNABLE_TO_FETCH_THE_FILE_BY_URL: String
   val UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT: String
@@ -130,10 +134,14 @@ object Locale {
       "A winner is you!"
     override val ATTACH_A_COMPLETE_LIST_OF_TAGS_TO_REPLY: String =
       "Attach a complete list of tags to reply."
+    override val BAKA_FD: String =
+      "baka baka"
     override val BOT_CONTROL_AND_ADMINISTRATION: String =
       "Bot control and administration."
     override val BOT_CONTROL_FD: String =
       "bot control"
+    override val CHAOMIAN_BAKA: String =
+      "Chaomian baka."
     override val CHARACTERS_FS: String =
       "Characters"
     override val CHECK_PROXY_AVAILABLE: String =
@@ -203,6 +211,8 @@ object Locale {
       "image request"
     override val INVALID_ARGUMENT_FS: String =
       "Invalid argument"
+    override val INVALID_LANGUAGE: String =
+      "Invalid language."
     override val INVALID_LOCALE_LIST_FORMAT: String =
       "Invalid locale: %s.\nSupported locales: %s."
     override val INVALID_SERVER_RESPONSE: String =
@@ -289,6 +299,8 @@ object Locale {
       "Tags"
     override val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String =
       "Target chat ID or alias for %s."
+    override val TRANSLATION_REQUEST_FV_FS: String =
+      "translation request"
     override val UNABLE_TO_FETCH_TELEGRAM_FILE: String =
       "Unable to fetch Telegram file."
     override val UNABLE_TO_FETCH_THE_FILE_BY_URL: String =
@@ -332,10 +344,14 @@ object Locale {
       "A winner is you!"
     override val ATTACH_A_COMPLETE_LIST_OF_TAGS_TO_REPLY: String =
       "Приложить полный список тегов к ответу."
+    override val BAKA_FD: String =
+      "baka baka"
     override val BOT_CONTROL_AND_ADMINISTRATION: String =
       "Управление и администрирование бота."
     override val BOT_CONTROL_FD: String =
       "управление ботом"
+    override val CHAOMIAN_BAKA: String =
+      "Chaomian baka."
     override val CHARACTERS_FS: String =
       "Персонажи"
     override val CHECK_PROXY_AVAILABLE: String =
@@ -405,6 +421,8 @@ object Locale {
       "запросе картинки"
     override val INVALID_ARGUMENT_FS: String =
       "Аргумент инвалид"
+    override val INVALID_LANGUAGE: String =
+      "Некорректный язык."
     override val INVALID_LOCALE_LIST_FORMAT: String =
       "Некорректный язык: %s.\nПоддерживаемые языки: %s."
     override val INVALID_SERVER_RESPONSE: String =
@@ -491,6 +509,8 @@ object Locale {
       "Теги"
     override val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String =
       "ID или псевдоним целевого чата для %s."
+    override val TRANSLATION_REQUEST_FV_FS: String =
+      "запросе перевода"
     override val UNABLE_TO_FETCH_TELEGRAM_FILE: String =
       "Не удалось получить файл Telegram."
     override val UNABLE_TO_FETCH_THE_FILE_BY_URL: String =

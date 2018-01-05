@@ -2,6 +2,7 @@ package nya.kitsunyan.littlechenbot
 
 import nya.kitsunyan.littlechenbot.command._
 import nya.kitsunyan.littlechenbot.command.common._
+import nya.kitsunyan.littlechenbot.service.TranslateService
 import nya.kitsunyan.littlechenbot.util.Configuration
 
 import info.mukel.telegrambot4s.api._
@@ -13,9 +14,9 @@ import scala.concurrent.Future
 object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
-  object ShikigamiBot extends TelegramBot with CustomPolling with Http with ForemanCommand with HelpCommand
-    with ControlCommand with PixivCommand with IqdbCommand with RateCommand with ReverseCommand
-    with AttachCommand with GuessCommand with IdentityCommand {
+  object ShikigamiBot extends TelegramBot with CustomPolling with Http with TranslateService.Configuration
+    with ForemanCommand with HelpCommand with ControlCommand with PixivCommand with IqdbCommand
+    with RateCommand with ReverseCommand with AttachCommand with GuessCommand with BakaCommand with IdentityCommand {
     override def token: String = configuration.string("bot.token").get
 
     override val workspace: Option[Long] = configuration.long("bot.workspace")
@@ -48,6 +49,8 @@ object BotApplication extends App {
     override val restartProxyCommand: Option[Seq[String]] = configuration.stringList("bot.proxy.restart")
 
     override val proxyWhitelist: Set[String] = configuration.stringList("bot.proxy.whitelist").getOrElse(Nil).toSet
+
+    override val translateNodeBinary: Option[String] = configuration.string("bot.node.binary")
 
     override def chatForAlias(alias: String): Option[Long] = {
       chats.find(_.alias.contains(alias)).map(_.id)
