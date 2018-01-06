@@ -17,6 +17,8 @@ trait Command extends BotBase with AkkaDefaults with GlobalExecutionContext {
   val workspace: Option[Long]
   val botOwner: Option[Long]
 
+  implicit val binaries: Binaries
+
   case class FilterChat(soft: Boolean, hard: Boolean, filtered: Boolean = false)
 
   def filterChat(message: Message): FilterChat = FilterChat(true, true)

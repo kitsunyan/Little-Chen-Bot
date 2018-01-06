@@ -2,8 +2,7 @@ package nya.kitsunyan.littlechenbot
 
 import nya.kitsunyan.littlechenbot.command._
 import nya.kitsunyan.littlechenbot.command.common._
-import nya.kitsunyan.littlechenbot.service.TranslateService
-import nya.kitsunyan.littlechenbot.util.Configuration
+import nya.kitsunyan.littlechenbot.util._
 
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
@@ -14,7 +13,7 @@ import scala.concurrent.Future
 object BotApplication extends App {
   private val configuration = Configuration("littlechenbot.conf")
 
-  object ShikigamiBot extends TelegramBot with CustomPolling with Http with TranslateService.Configuration
+  object ShikigamiBot extends TelegramBot with CustomPolling with Http
     with ForemanCommand with HelpCommand with ControlCommand with PixivCommand with IqdbCommand
     with RateCommand with ReverseCommand with AttachCommand with GuessCommand
     with SayCommand with BakaCommand with IdentityCommand {
@@ -23,6 +22,15 @@ object BotApplication extends App {
     override val workspace: Option[Long] = configuration.long("bot.workspace")
     override val bot: Future[Bot] = getMe.map(m => Bot(m.username.getOrElse(""), m.id))
     override val botOwner: Option[Long] = configuration.long("bot.owner")
+
+    override implicit val binaries: Binaries = new Binaries {
+      private def binary(name: String): String = configuration.string(s"bot.binaries.$name").getOrElse(name)
+
+      override val dwebp: String = binary("dwebp")
+      override val ffmpeg: String = binary("ffmpeg")
+      override val magick: String = binary("magick")
+      override val node: String = binary("node")
+    }
 
     override val startTime: Long = executionStart
 
@@ -50,8 +58,6 @@ object BotApplication extends App {
     override val restartProxyCommand: Option[Seq[String]] = configuration.stringList("bot.proxy.restart")
 
     override val proxyWhitelist: Set[String] = configuration.stringList("bot.proxy.whitelist").getOrElse(Nil).toSet
-
-    override val translateNodeBinary: Option[String] = configuration.string("bot.node.binary")
 
     override def chatForAlias(alias: String): Option[Long] = {
       chats.find(_.alias.contains(alias)).map(_.id)

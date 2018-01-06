@@ -10,7 +10,7 @@ import info.mukel.telegrambot4s.models._
 import scala.concurrent.Future
 
 trait SayCommand extends Command {
-  this: Http with TranslateService.Configuration =>
+  this: Http =>
 
   private val commands = List("say")
 

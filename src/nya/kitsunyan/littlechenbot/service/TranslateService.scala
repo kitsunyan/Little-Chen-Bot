@@ -13,12 +13,6 @@ import scala.annotation.tailrec
 import scala.concurrent._
 
 object TranslateService {
-  trait Configuration {
-    implicit val translateConfiguration: Configuration = this
-
-    val translateNodeBinary: Option[String]
-  }
-
   private val actor = ActorSystem("TranslateService").actorOf(Props(new TranslateActor))
   private implicit val timeout: Timeout = Timeout(1, TimeUnit.DAYS)
 
@@ -129,7 +123,7 @@ object TranslateService {
     }
   }
 
-  private def tkArgument(input: String)(implicit configuration: Configuration,
+  private def tkArgument(input: String)(implicit binaries: Binaries,
     http: Http, executionContext: ExecutionContext): Future[String] = {
     (actor ? ObtainCalculationScript(http, executionContext))
       .mapTo[Future[String]].flatten.map { calculationScript =>
@@ -142,8 +136,7 @@ object TranslateService {
           output.close()
         }
 
-        val nodeBinary = configuration.translateNodeBinary.getOrElse("node")
-        new String(Utils.exec(None, Seq(nodeBinary, file.getAbsolutePath, input)), "UTF-8")
+        new String(Utils.exec(None, Seq(binaries.node, file.getAbsolutePath, input)), "UTF-8")
       } finally {
         file.delete()
       }
@@ -154,7 +147,7 @@ object TranslateService {
     java.net.URLEncoder.encode(s, "UTF-8")
   }
 
-  def transliterate(input: String)(implicit configuration: Configuration,
+  def transliterate(input: String)(implicit binaries: Binaries,
     http: Http, executionContext: ExecutionContext): Future[String] = {
     tkArgument(input)
       .flatMap(tk => http
@@ -173,7 +166,7 @@ object TranslateService {
       }
   }
 
-  def guessLanguage(input: String)(implicit configuration: Configuration,
+  def guessLanguage(input: String)(implicit binaries: Binaries,
     http: Http, executionContext: ExecutionContext): Future[Option[String]] = {
     tkArgument(input)
       .flatMap(tk => http
@@ -190,11 +183,11 @@ object TranslateService {
       }
   }
 
-  private def mp3ToOpus(data: Array[Byte]): Array[Byte] = {
-    Utils.exec(Some(data), Seq("ffmpeg", "-f", "mp3", "-i", "-", "-f", "opus", "-"))
+  private def mp3ToOpus(data: Array[Byte])(implicit binaries: Binaries): Array[Byte] = {
+    Utils.exec(Some(data), Seq(binaries.ffmpeg, "-f", "mp3", "-i", "-", "-f", "opus", "-"))
   }
 
-  def textToSpeech(input: String, language: String)(implicit configuration: Configuration,
+  def textToSpeech(input: String, language: String)(implicit binaries: Binaries,
     http: Http, executionContext: ExecutionContext): Future[Array[Byte]] = {
     def request(tk: String, language: String): Future[Http.HttpResponse[Array[Byte]]] = {
       http.http(s"$origin/translate_tts?q=${urlEncode(input)}&tl=${urlEncode(language)}&client=t$tk")

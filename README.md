@@ -56,7 +56,10 @@ Available properties:
 * `bot.proxy.type` — Proxy type: http, socks, direct (`String`)
 * `bot.proxy.restart` — Command to restart proxy (list of `String`)
 * `bot.proxy.whitelist` — Proxy will not be used for these hosts (list of `String`)
-* `bot.node.binary` — Path to Node.js binary (`String`)
+* `bot.binaries.dwebp` — Path to WebP decompresser binary (`String`)
+* `bot.binaries.ffmpeg` — Path to FFmpeg binary (`String`)
+* `bot.binaries.magick` — Path to ImageMagick binary (`String`)
+* `bot.binaries.node` — Path to Node.js binary (`String`)
 
 A `bot.workspace` parameter allows to save some data using chat messages. A special chat should be created for a bot where it will send messages and obtain them later. It's possible in Telegtam to create a group and leave it then leaving only a bot in the chat.
 

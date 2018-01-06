@@ -18,9 +18,9 @@ object Utils {
     }
   }
 
-  def webpToPng(data: Array[Byte]): Option[Array[Byte]] = {
+  def webpToPng(data: Array[Byte])(implicit binaries: Binaries): Option[Array[Byte]] = {
     try {
-      Some(exec(Some(data), List("dwebp", "-o", "-", "--", "-")))
+      Some(exec(Some(data), List(binaries.dwebp, "-o", "-", "--", "-")))
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -54,7 +54,7 @@ object Utils {
     def extension: Option[String] = mimeTypeMap.lift(mimeType)
   }
 
-  def drawPreview(previews: List[Preview]): Option[Array[Byte]] = {
+  def drawPreview(previews: List[Preview])(implicit binaries: Binaries): Option[Array[Byte]] = {
     case class Rect(left: Int, top: Int, right: Int, bottom: Int)
     case class Point(x: Int, y: Int)
 
@@ -86,7 +86,7 @@ object Utils {
             }
             val blurRadius = math.max(width, height) / denominator
 
-            val c1 = List("convert", extensionIn, "-resize", s"${width}x${height}")
+            val c1 = List(binaries.magick, extensionIn, "-resize", s"${width}x${height}")
             val c2 = List("-blur", s"${blurRadius}x${blurRadius / 2}")
             val c3 = List("-background", imageBackgroundColor, "-gravity", "center",
               "-extent", s"${width}x${height}", "png:-")
@@ -96,7 +96,7 @@ object Utils {
         }
 
         (preview.index, newImage, preview.blurMode.color)
-      }.foldLeft(exec(None, List("convert", "-size", s"${totalWidth}x${totalHeight}",
+      }.foldLeft(exec(None, List(binaries.magick, "-size", s"${totalWidth}x${totalHeight}",
         s"canvas:$backgroundColor", "png:-")), 0) { case ((result, i), (index, image, indexCircleColor)) =>
         // Draw each image on canvas
         (image.map { image =>
@@ -126,7 +126,7 @@ object Utils {
               if (value > 0) s"+$value" else s"$value"
             }
 
-            exec(Some(result), List("convert", "png:-",
+            exec(Some(result), List(binaries.magick, "png:-",
               file.getPath, "-geometry", s"+$imageX+$imageY", "-composite",
               "-fill", backgroundColor, "-draw", s"rectangle $indexX,$indexY $indexXedge,$indexYedge",
               "-fill", indexCircleColor, "-draw", s"circle $indexX,$indexY ${indexXedge - 1},$indexY",
