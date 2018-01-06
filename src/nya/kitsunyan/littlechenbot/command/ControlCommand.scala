@@ -155,29 +155,30 @@ trait ControlCommand extends Command {
           .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
       }.recoverWith(handleError(None)(message))
     } else if (arguments("request-permission").nonEmpty) {
-      if (softFiltered) {
-        replyQuote(locale.PERMISSION_IS_ALREADY_GRANTED)
-          .statusMap(Status.Fail)
-      } else {
-        botOwner.map { botOwner =>
-          val chatId = message.chat.id
-          val username = message.chat.username.map("@" + _).getOrElse("unknown")
-          val requester = message.from.map(u => u.username
-            .getOrElse(u.lastName.map(u.firstName + " " + _).getOrElse(u.firstName)))
-            .getOrElse("unknown")
-          val requestMessage = arguments("request-permission").asString.filter(!_.isEmpty).getOrElse("empty message")
-          val ownerMessage = s"Permission request:\nChat ID: $chatId\nUsername: $username\n" +
-            s"Requester: $requester\nMessage: $requestMessage"
-
-          request(SendMessage(botOwner, ownerMessage))
-            .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
-            .statusMap(Status.Success)
-            .recoverWith(handleError(None)(message))
-        }.getOrElse {
-          replyQuote(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)
+      checkArguments(arguments, 0, "request-permission").unitFlatMap {
+        if (softFiltered) {
+          replyQuote(locale.PERMISSION_IS_ALREADY_GRANTED)
             .statusMap(Status.Fail)
+        } else {
+          botOwner.map { botOwner =>
+            val chatId = message.chat.id
+            val username = message.chat.username.map("@" + _).getOrElse("unknown")
+            val requester = message.from.map(u => u.username
+              .getOrElse(u.lastName.map(u.firstName + " " + _).getOrElse(u.firstName)))
+              .getOrElse("unknown")
+            val requestMessage = arguments("request-permission").asString.filter(!_.isEmpty).getOrElse("empty message")
+            val ownerMessage = s"Permission request:\nChat ID: $chatId\nUsername: $username\n" +
+              s"Requester: $requester\nMessage: $requestMessage"
+
+            request(SendMessage(botOwner, ownerMessage))
+              .flatMap(_ => replyQuote(locale.MESSAGE_SENT))
+              .statusMap(Status.Success)
+          }.getOrElse {
+            replyQuote(locale.SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT)
+              .statusMap(Status.Fail)
+          }
         }
-      }
+      }.recoverWith(handleError(None)(message))
     } else if (arguments("uptime").nonEmpty) {
       val uptime = (System.currentTimeMillis - startTime) / 1000
       val seconds = uptime % 60
