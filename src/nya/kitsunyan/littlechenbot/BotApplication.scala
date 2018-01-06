@@ -69,7 +69,8 @@ object BotApplication extends App {
       } else {
         val soft = chats.map(_.id).contains(message.chat.id) ||
           chatsAnyPrivate && Set(ChatType.Private).contains(message.chat.`type`) ||
-          chatsAnyGroup && Set(ChatType.Group, ChatType.Supergroup).contains(message.chat.`type`)
+          chatsAnyGroup && Set(ChatType.Group, ChatType.Supergroup).contains(message.chat.`type`) ||
+          botOwner.exists(id => message.from.exists(_.id == id))
         FilterChat(soft, true)
       }
     }
