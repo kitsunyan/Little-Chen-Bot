@@ -173,6 +173,23 @@ object TranslateService {
       }
   }
 
+  def guessLanguage(input: String)(implicit configuration: Configuration,
+    http: Http, executionContext: ExecutionContext): Future[Option[String]] = {
+    tkArgument(input)
+      .flatMap(tk => http
+        .http(s"$origin/translate_a/single?sl=auto&tl=en&ie=UTF-8&oe=UTF-8&q=${urlEncode(input)}&client=t$tk")
+        .runString(Http.Filters.ok))
+      .map { response =>
+        import org.json4s._
+        import org.json4s.jackson.JsonMethods._
+
+        parse(response.body)(2) match {
+          case JString(s) => Some(s)
+          case _ => None
+        }
+      }
+  }
+
   private def mp3ToOpus(data: Array[Byte]): Array[Byte] = {
     Utils.exec(Some(data), Seq("ffmpeg", "-f", "mp3", "-i", "-", "-f", "opus", "-"))
   }

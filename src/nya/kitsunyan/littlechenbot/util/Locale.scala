@@ -88,12 +88,15 @@ sealed trait Locale {
   val SET_LOCALE_FOR_THIS_CHAT: String
   val SET_MINIMUM_ALLOWED_SIMILARITY_FOR_FOUND_IMAGES: String
   val SET_PRIORITY_FOR_BOORU_SERVICES: String
+  val SET_TARGET_LANGUAGE: String
   val SHOW_UPTIME: String
   val SOMETHING_WENT_WRONG: String
   val SORRY_MY_CONFIGURATION_DOESNT_ALLOW_ME_TO_DO_IT: String
   val SUPPORTED_BOORU_SERVICES_FS: String
   val TAGS_FS: String
   val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String
+  val TEXT_TO_SPEECH: String
+  val TEXT_TO_SPEECH_FD: String
   val TRANSLATION_REQUEST_FV_FS: String
   val UNABLE_TO_FETCH_TELEGRAM_FILE: String
   val UNABLE_TO_FETCH_THE_FILE_BY_URL: String
@@ -287,6 +290,8 @@ object Locale {
       "Set minimum allowed similarity for found images."
     override val SET_PRIORITY_FOR_BOORU_SERVICES: String =
       "Set priority for \\*booru services."
+    override val SET_TARGET_LANGUAGE: String =
+      "Set target language (en, ja, …)."
     override val SHOW_UPTIME: String =
       "Show uptime."
     override val SOMETHING_WENT_WRONG: String =
@@ -299,6 +304,10 @@ object Locale {
       "Tags"
     override val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String =
       "Target chat ID or alias for %s."
+    override val TEXT_TO_SPEECH: String =
+      "Text to speech."
+    override val TEXT_TO_SPEECH_FD: String =
+      "text to speech"
     override val TRANSLATION_REQUEST_FV_FS: String =
       "translation request"
     override val UNABLE_TO_FETCH_TELEGRAM_FILE: String =
@@ -497,6 +506,8 @@ object Locale {
       "Установить минимальное сходство для найденых картинок."
     override val SET_PRIORITY_FOR_BOORU_SERVICES: String =
       "Установить приоритет для \\*booru сервисов."
+    override val SET_TARGET_LANGUAGE: String =
+      "Установить целевой язык (en, ja, …)."
     override val SHOW_UPTIME: String =
       "Показать время работы."
     override val SOMETHING_WENT_WRONG: String =
@@ -509,6 +520,10 @@ object Locale {
       "Теги"
     override val TARGET_CHAT_ID_OR_ALIAS_FOR_FORMAT: String =
       "ID или псевдоним целевого чата для %s."
+    override val TEXT_TO_SPEECH: String =
+      "Синтез речи."
+    override val TEXT_TO_SPEECH_FD: String =
+      "синтезировать речь"
     override val TRANSLATION_REQUEST_FV_FS: String =
       "запросе перевода"
     override val UNABLE_TO_FETCH_TELEGRAM_FILE: String =
