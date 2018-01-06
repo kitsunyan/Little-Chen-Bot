@@ -154,12 +154,13 @@ trait Command extends BotBase with AkkaDefaults with GlobalExecutionContext {
 
   def handleNotPermittedWarning(implicit message: Message, locale: Locale): Future[Any] = Future.unit
 
-  def checkArguments(arguments: Arguments, possibleArguments: String*)(implicit locale: Locale): Future[Unit] = {
+  def checkArguments(arguments: Arguments, maxFreeValues: Int, possibleArguments: String*)
+    (implicit locale: Locale): Future[Unit] = {
     val invalidArguments = arguments.keySet.diff(possibleArguments.toSet[String])
 
-    if (invalidArguments.nonEmpty) {
-      val printInvalidArgument = clearMarkup(invalidArguments.find(!_.isEmpty)
-        .getOrElse(arguments.freeValue.asString.flatMap(_.split("\n").headOption).getOrElse("")))
+    if (invalidArguments.nonEmpty || arguments.free.length > maxFreeValues) {
+      val printInvalidArgument = clearMarkup(invalidArguments.find(_.nonEmpty)
+        .getOrElse(arguments.free.flatMap(_.asString.flatMap(_.split("\n").headOption)).find(_.nonEmpty).getOrElse("")))
 
       Future.failed(new CommandException(s"${locale.INVALID_ARGUMENT_FS}: $printInvalidArgument."))
     } else {

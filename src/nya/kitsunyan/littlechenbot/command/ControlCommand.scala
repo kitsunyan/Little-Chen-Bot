@@ -48,7 +48,7 @@ trait ControlCommand extends Command {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         val commands =
           (true, false, List("--check-proxy"), None,
             locale.CHECK_PROXY_AVAILABLE) ::
@@ -81,7 +81,7 @@ trait ControlCommand extends Command {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else if (softFiltered && arguments("check-proxy").nonEmpty) {
-      checkArguments(arguments, "check-proxy").unitFlatMap {
+      checkArguments(arguments, 0, "check-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           http("https://gelbooru.com", proxy = true)
             .runString(Http.Filters.ok)
@@ -95,7 +95,7 @@ trait ControlCommand extends Command {
         }
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && ownerMessage && arguments("restart-proxy").nonEmpty) {
-      checkArguments(arguments, "restart-proxy").unitFlatMap {
+      checkArguments(arguments, 0, "restart-proxy").unitFlatMap {
         if (proxy.nonEmpty) {
           restartProxyCommand.map { restartProxyCommand =>
             Future(Utils.exec(None, restartProxyCommand))
@@ -112,7 +112,7 @@ trait ControlCommand extends Command {
         }
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && ownerMessage && arguments("m", "send-message").nonEmpty) {
-      checkArguments(arguments, "m", "send-message", "t", "target-chat").unitFlatMap {
+      checkArguments(arguments, 0, "m", "send-message", "t", "target-chat").unitFlatMap {
         val targetChatValue = arguments("t", "target-chat")
         val targetChat = (targetChatValue.asLong orElse targetChatValue.asString.flatMap(chatForAlias))
           .getOrElse(message.chat.id)
@@ -123,7 +123,7 @@ trait ControlCommand extends Command {
           .recoverWith(handleError(Some(locale.SENDING_THE_MESSAGE_FL_FS))(message))
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && arguments("d", "delete-message").nonEmpty) {
-      checkArguments(arguments, "d", "delete-message").unitFlatMap {
+      checkArguments(arguments, 0, "d", "delete-message").unitFlatMap {
         checkAdministratorOrOwner.unitFlatMap {
           val messageIdFuture = bot.map { bot =>
             message.replyToMessage.flatMap { replyToMessage =>
@@ -141,7 +141,7 @@ trait ControlCommand extends Command {
           .recoverWith(handleError(Some(locale.CONFIGURATION_HANDLING_FV_FS))(message))
       }.recoverWith(handleError(None)(message))
     } else if (softFiltered && arguments("set-locale").nonEmpty) {
-      checkArguments(arguments, "set-locale").unitFlatMap {
+      checkArguments(arguments, 0, "set-locale").unitFlatMap {
         checkAdministratorOrOwner.unitFlatMap {
           val localeString = arguments("set-locale").asString
           localeString.flatMap(Locale.get).map { newLocale =>
@@ -186,12 +186,12 @@ trait ControlCommand extends Command {
       val days = uptime / 60 / 60 / 24
       val uptimeString = s"${days}d ${hours}h ${minutes}m ${seconds}s"
 
-      checkArguments(arguments, "uptime")
+      checkArguments(arguments, 0, "uptime")
         .unitFlatMap(replyQuote(uptimeString)
           .statusMap(Status.Success))
         .recoverWith(handleError(None)(message))
     } else {
-      checkArguments(arguments).unitFlatMap {
+      checkArguments(arguments, 0).unitFlatMap {
         replyQuote(locale.UNKNOWN_COMMAND_TYPE_TO_VIEW_HELP_FORMAT.format(s"`/${commands.head} --help`"),
           Some(ParseMode.Markdown))
           .statusMap(Status.Fail)

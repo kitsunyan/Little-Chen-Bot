@@ -112,7 +112,7 @@ trait RateCommand extends Command with ExtractImage {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.RATE_IMAGE_USING_EVERYPIXEL_COM,
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
@@ -120,7 +120,7 @@ trait RateCommand extends Command with ExtractImage {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      checkArguments(arguments)
+      checkArguments(arguments, 0)
         .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
           .zip(obtainEverypixelToken)

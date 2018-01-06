@@ -221,7 +221,7 @@ trait PixivCommand extends Command with ExtractImage {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.FETCH_IMAGE_FROM_PIXIV_USING_SAUCENAO,
           (List("-i", "--indices"), Some("integer list"),
             locale.FETCH_IMAGE_BY_INDEX) ::
@@ -234,7 +234,7 @@ trait PixivCommand extends Command with ExtractImage {
       val indicesOption = arguments("i", "indices").asIntList
 
       indicesOption.map { indices =>
-        checkArguments(arguments, "i", "indices")
+        checkArguments(arguments, 0, "i", "indices")
           .unitFlatMap(extractUrlsListFromWorkspace)
           .flatMap(list => indices
             .foldLeft(Future.unit)((f, i) => f
@@ -244,7 +244,7 @@ trait PixivCommand extends Command with ExtractImage {
           .statusMap(Status.Success)
           .recoverWith(handleError(Some(locale.IMAGE_REQUEST_FV_FS))(message))
       } getOrElse {
-        checkArguments(arguments)
+        checkArguments(arguments, 0)
           .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
           .scopeFlatMap((_, file) => readTelegramFile(file)
             .flatMap(sendSaucenaoRequest)

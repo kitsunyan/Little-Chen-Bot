@@ -48,44 +48,50 @@ class Arguments(data: String) {
     }
   }
 
-  @tailrec private def mapArguments(arguments: List[String], targetParameter: Option[String],
-    result: Map[String, String]): Map[String, String] = {
-    if (arguments.nonEmpty) {
-      val argument = arguments.head
+  @tailrec private def mapArguments(tokens: List[String], targetParameter: Option[String],
+    arguments: Map[String, String], freeArguments: List[String]): (Map[String, String], List[String]) = {
+    if (tokens.nonEmpty) {
+      val token = tokens.head
 
-      val (parameter, modifiedResult) = if (argument.startsWith("--") && argument.length > 3) {
-        (Some(argument.substring(2)), result)
-      } else if (argument.startsWith("—") && argument.length > 2) {
-        (Some(argument.substring(1)), result)
-      } else if (argument.startsWith("-") && argument.length > 1) {
-        val parameter = argument.substring(1)
+      val (parameter, modifiedArguments) = if (token.startsWith("--") && token.length > 3) {
+        (Some(token.substring(2)), arguments)
+      } else if (token.startsWith("—") && token.length > 2) {
+        (Some(token.substring(1)), arguments)
+      } else if (token.startsWith("-") && token.length > 1) {
+        val parameter = token.substring(1)
 
-        val (modifiedParameter, modifiedResult) = if (parameter.length > 1) {
+        val (modifiedParameter, modifiedArguments) = if (parameter.length > 1) {
           (parameter.charAt(parameter.length - 1).toString, parameter.substring(0, parameter.length - 1)
-            .foldLeft(result)((r, c) => r + (c.toString -> "")))
+            .foldLeft(arguments)((r, c) => r + (c.toString -> "")))
         } else {
-          (parameter, result)
+          (parameter, arguments)
         }
 
-        (Some(modifiedParameter), modifiedResult)
+        (Some(modifiedParameter), modifiedArguments)
       } else {
-        (None, result)
+        (None, arguments)
       }
 
       if (parameter.nonEmpty) {
-        mapArguments(arguments.tail, parameter, targetParameter.map(p => modifiedResult + (p -> ""))
-          .getOrElse(modifiedResult))
+        mapArguments(tokens.tail, parameter, targetParameter.map(p => modifiedArguments + (p -> ""))
+          .getOrElse(modifiedArguments), freeArguments)
       } else {
-        mapArguments(arguments.tail, None, modifiedResult + (targetParameter.getOrElse("") -> argument))
+        targetParameter match {
+          case Some(targetParameter) =>
+            mapArguments(tokens.tail, None, modifiedArguments + (targetParameter -> token), freeArguments)
+          case None =>
+            mapArguments(tokens.tail, None, modifiedArguments, token :: freeArguments)
+        }
       }
     } else {
-      targetParameter.map(p => result + (p -> "")).getOrElse(result)
+      (targetParameter.map(p => arguments + (p -> "")).getOrElse(arguments), freeArguments.reverse)
     }
   }
 
-  private val (arguments, nextCommandOption) = {
-    val (list, nextMode, nextCommand) = splitSpaces(0, false, false, Nil, Nil, false, false)
-    (mapArguments(list, None, Map()), nextCommand.map((nextMode, _)))
+  private val (arguments, freeValues, nextCommandOption) = {
+    val (tokens, nextMode, nextCommand) = splitSpaces(0, false, false, Nil, Nil, false, false)
+    val (arguments, freeValues) = mapArguments(tokens, None, Map(), Nil)
+    (arguments, freeValues, nextCommand.map((nextMode, _)))
   }
 
   def keySet: Set[String] = arguments.keys.toSet
@@ -137,9 +143,7 @@ class Arguments(data: String) {
     new ArgumentValue(arguments.filterKeys(keys.contains).values.headOption)
   }
 
-  def freeValue: ArgumentValue = {
-    new ArgumentValue(arguments.get(""))
-  }
+  lazy val free: List[ArgumentValue] = freeValues.map(value => new ArgumentValue(Some(value)))
 
   def nextCommand: Option[(NextMode, String)] = this.nextCommandOption
 }

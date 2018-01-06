@@ -21,7 +21,7 @@ trait HelpCommand extends Command {
 
   private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.DISPLAY_LIST_OF_SUPPORTED_COMMANDS,
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
@@ -29,7 +29,7 @@ trait HelpCommand extends Command {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      checkArguments(arguments).unitFlatMap {
+      checkArguments(arguments, 0).unitFlatMap {
         val listOfCommands = prependDescription(Nil, locale)
           .foldRight(s"${locale.LIST_OF_SUPPORTED_COMMANDS_FS}:\n") { (v, a) =>
           s"$a\n/${v.commands.head} — ${clearMarkup(v.text)}"

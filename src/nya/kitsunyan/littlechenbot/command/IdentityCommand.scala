@@ -20,7 +20,7 @@ trait IdentityCommand extends Command {
 
   private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.GET_INFORMATION_ABOUT_QUOTED_USER_OR_YOURSELF,
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
@@ -28,7 +28,7 @@ trait IdentityCommand extends Command {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else {
-      checkArguments(arguments).unitFlatMap {
+      checkArguments(arguments, 0).unitFlatMap {
         val targetMessage = message.replyToMessage.getOrElse(message)
         val name = targetMessage.from
           .map(u => u.firstName + u.lastName.map(" " + _).getOrElse(""))

@@ -331,7 +331,7 @@ trait IqdbCommand extends Command with ExtractImage {
     val priorityOption = arguments("p", "priority").asStringList
 
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.FETCH_IMAGE_FROM_BOORU_USING_IQDB_ORG,
           (List("-i", "--index"), Some("integer"),
             locale.FETCH_IMAGE_BY_SPECIFIED_INDEX) ::
@@ -357,7 +357,7 @@ trait IqdbCommand extends Command with ExtractImage {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else if (arguments("example").nonEmpty) {
-      checkArguments(arguments, "example").unitFlatMap {
+      checkArguments(arguments, 0, "example").unitFlatMap {
         replyQuote(s"${locale.EXAMPLES_OF_USAGE_FS}:" +
           s"\n\n${locale.FETCH_IMAGE_BY_INDEX_FS}:" +
           "\n    `/iqdb --index 2`" +
@@ -392,7 +392,7 @@ trait IqdbCommand extends Command with ExtractImage {
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
     } else if (arguments("list").nonEmpty) {
-      checkArguments(arguments, "list").unitFlatMap {
+      checkArguments(arguments, 0, "list").unitFlatMap {
         replyQuote(s"${locale.SUPPORTED_BOORU_SERVICES_FS}:" + BooruService.list.foldLeft(1, "\n") { case ((i, a), v) =>
           val primaryDomain = v.aliases.find(_.primaryDomain).get.name
           val aliases = v.aliases.filter(!_.primaryDomain).map(_.name).reduce(_ + "_, _" + _)
@@ -405,7 +405,7 @@ trait IqdbCommand extends Command with ExtractImage {
       val reset = arguments("reset").nonEmpty
 
       message.from.map(_.id.toLong).map { userId =>
-        checkArguments(arguments, "c", "configure", "reset", "s", "min-similarity", "p", "priority")
+        checkArguments(arguments, 0, "c", "configure", "reset", "s", "min-similarity", "p", "priority")
           .unitFlatMap(IqdbConfigurationData.get(userId))
           .map(configureItem(userId, similarityOption, priorityOption, reset))
           .flatMap((storeConfiguration _).tupled).map(printConfiguration)
@@ -424,7 +424,7 @@ trait IqdbCommand extends Command with ExtractImage {
         .getOrElse(Future.successful(None))
         .map(_ orElse extractMessageWithImage)
 
-      checkArguments(arguments, "i", "index", "q", "query", "t", "tags", "s", "min-similarity", "p", "priority")
+      checkArguments(arguments, 0, "i", "index", "q", "query", "t", "tags", "s", "min-similarity", "p", "priority")
         .unitFlatMap(messageWithImageFuture)
         .map(obtainMessageFile(commands.head))
         .scopeFlatMap((messageWithImage, file) => readTelegramFile(file)

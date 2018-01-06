@@ -24,7 +24,7 @@ trait BakaCommand extends Command {
 
   private def handleMessageInternal(implicit message: Message, arguments: Arguments, locale: Locale): Future[Status] = {
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.CHAOMIAN_BAKA,
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
@@ -40,7 +40,7 @@ trait BakaCommand extends Command {
           .map(lastName => s"${from.firstName} $lastName")
           .getOrElse(from.firstName))
 
-      checkArguments(arguments)
+      checkArguments(arguments, 0)
         .unitFlatMap(name
           .map(TranslateService.transliterate)
           .map(_.map(name => s"$name baka"))

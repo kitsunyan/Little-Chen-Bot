@@ -271,7 +271,7 @@ trait GuessCommand extends Command {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.A_SMALL_GAME_IN_GUESSING_A_CHARACTER,
           (List("-t", "--tags"), Some("string list"),
             locale.A_LIST_OF_TAGS_TO_PUZZLE_A_CHARACTER) ::
@@ -283,7 +283,7 @@ trait GuessCommand extends Command {
     } else {
       val tags = arguments("t", "tags").asStringList.getOrElse(Nil)
 
-      checkArguments(arguments, "t", "tags")
+      checkArguments(arguments, 0, "t", "tags")
         .unitFlatMap(queryImages(tags))
         .flatMap(readRandomImage(tags))
         .flatMap(createSession)

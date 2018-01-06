@@ -33,7 +33,7 @@ trait AttachCommand extends Command with ExtractImage {
     }
 
     if (arguments("h", "help").nonEmpty) {
-      checkArguments(arguments, "h", "help").unitFlatMap {
+      checkArguments(arguments, 0, "h", "help").unitFlatMap {
         replyMan(locale.DOWNLOAD_AND_ATTACH_IMAGE,
           (List("-d", "--as-document"), None,
             locale.FETCH_IMAGE_AS_DOCUMENT) ::
@@ -45,7 +45,7 @@ trait AttachCommand extends Command with ExtractImage {
     } else {
       val asDocument = arguments("d", "as-document").nonEmpty
 
-      checkArguments(arguments, "d", "as-document")
+      checkArguments(arguments, 0, "d", "as-document")
         .unitMap(obtainMessageFile(commands.head)(extractMessageWithImage))
         .scopeFlatMap((_, file) => readTelegramFile(file)
           .flatMap(replyWithImage(asDocument))
