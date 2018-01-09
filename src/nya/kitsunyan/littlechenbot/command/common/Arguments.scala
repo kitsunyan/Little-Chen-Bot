@@ -49,38 +49,43 @@ class Arguments(data: String) {
   }
 
   @tailrec private def mapArguments(tokens: List[String], targetParameter: Option[String],
-    arguments: Map[String, String], freeArguments: List[String]): (Map[String, String], List[String]) = {
+    arguments: Map[String, String], freeArguments: List[String], optionsEnd: Boolean):
+    (Map[String, String], List[String]) = {
     if (tokens.nonEmpty) {
       val token = tokens.head
 
-      val (parameter, modifiedArguments) = if (token.startsWith("--") && token.length > 3) {
-        (Some(token.substring(2)), arguments)
-      } else if (token.startsWith("—") && token.length > 2) {
-        (Some(token.substring(1)), arguments)
-      } else if (token.startsWith("-") && token.length > 1) {
-        val parameter = token.substring(1)
+      if (!optionsEnd && (token == "--" || token == "—")) {
+        mapArguments(tokens.tail, None, arguments, freeArguments, true)
+      } else {
+        val (parameter, modifiedArguments) = if (!optionsEnd && token.startsWith("--") && token.length > 3) {
+          (Some(token.substring(2)), arguments)
+        } else if (!optionsEnd && token.startsWith("—") && token.length > 2) {
+          (Some(token.substring(1)), arguments)
+        } else if (!optionsEnd && token.startsWith("-") && token.length > 1) {
+          val parameter = token.substring(1)
 
-        val (modifiedParameter, modifiedArguments) = if (parameter.length > 1) {
-          (parameter.charAt(parameter.length - 1).toString, parameter.substring(0, parameter.length - 1)
-            .foldLeft(arguments)((r, c) => r + (c.toString -> "")))
+          val (modifiedParameter, modifiedArguments) = if (parameter.length > 1) {
+            (parameter.charAt(parameter.length - 1).toString, parameter.substring(0, parameter.length - 1)
+              .foldLeft(arguments)((r, c) => r + (c.toString -> "")))
+          } else {
+            (parameter, arguments)
+          }
+
+          (Some(modifiedParameter), modifiedArguments)
         } else {
-          (parameter, arguments)
+          (None, arguments)
         }
 
-        (Some(modifiedParameter), modifiedArguments)
-      } else {
-        (None, arguments)
-      }
-
-      if (parameter.nonEmpty) {
-        mapArguments(tokens.tail, parameter, targetParameter.map(p => modifiedArguments + (p -> ""))
-          .getOrElse(modifiedArguments), freeArguments)
-      } else {
-        targetParameter match {
-          case Some(targetParameter) =>
-            mapArguments(tokens.tail, None, modifiedArguments + (targetParameter -> token), freeArguments)
-          case None =>
-            mapArguments(tokens.tail, None, modifiedArguments, token :: freeArguments)
+        if (parameter.nonEmpty) {
+          mapArguments(tokens.tail, parameter, targetParameter.map(p => modifiedArguments + (p -> ""))
+            .getOrElse(modifiedArguments), freeArguments, optionsEnd)
+        } else {
+          targetParameter match {
+            case Some(targetParameter) =>
+              mapArguments(tokens.tail, None, modifiedArguments + (targetParameter -> token), freeArguments, optionsEnd)
+            case None =>
+              mapArguments(tokens.tail, None, modifiedArguments, token :: freeArguments, optionsEnd)
+          }
         }
       }
     } else {
@@ -90,7 +95,7 @@ class Arguments(data: String) {
 
   private val (arguments, freeValues, nextCommandOption) = {
     val (tokens, nextMode, nextCommand) = splitSpaces(0, false, false, Nil, Nil, false, false)
-    val (arguments, freeValues) = mapArguments(tokens, None, Map(), Nil)
+    val (arguments, freeValues) = mapArguments(tokens, None, Map(), Nil, false)
     (arguments, freeValues, nextCommand.map((nextMode, _)))
   }
 
