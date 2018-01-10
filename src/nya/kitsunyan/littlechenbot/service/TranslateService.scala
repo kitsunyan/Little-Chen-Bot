@@ -213,4 +213,30 @@ object TranslateService {
         }
       }
   }
+
+  case class Language(code: String, source: Boolean)(val name: String, val tts: Boolean)
+
+  def languages(implicit http: Http, executionContext: ExecutionContext): Future[List[Language]] = {
+    def source(name: String): Option[Boolean] = {
+      if (name == "sl") Some(true) else if (name == "tl") Some(false) else None
+    }
+
+    http.http(origin).runString(Http.Filters.ok).map(_.body)
+      .map("<select .*?name=([a-z]+).*?>(.*?)</select>".r.findAllMatchIn)
+      .map(_.flatMap(select => "<option value=([a-zA-Z-]+)>(.*?)</option>".r.findAllMatchIn(select.subgroups(1))
+        .flatMap(option => source(select.subgroups(0)).map((option.subgroups(0), _, option.subgroups(1))))))
+      .flatMap(list => moduleScript
+        .map(_.body)
+        .map("Lv=\\{(.*?)\\}".r.findFirstMatchIn)
+        .map(_.flatMap(_.subgroups.headOption)
+          .map("\"?([a-z-]+)\"?:(\\d+)".r.findAllMatchIn)
+          .map(_.flatMap(lv => if (lv.subgroups(1).toInt != 0) Some(lv.subgroups(0)) else None))
+          .getOrElse(Nil))
+        .map { translatable =>
+          val set = translatable.toSet
+          list.map {
+            case (code, source, name) => Language(code, source)(name, set.contains(code.toLowerCase))
+          }.toList.distinct.sortBy(_.code)
+        })
+  }
 }

@@ -57,6 +57,7 @@ sealed trait Locale {
   val IT_WORKS: String
   val LOCALE_INSTALLED: String
   val LIST_OF_SUPPORTED_COMMANDS_FS: String
+  val LIST_SUPPORTED_LANGUAGES: String
   val MESSAGE_SENT: String
   val NEXT_TAG_FS: String
   val NO_IMAGES_FOUND_DUE_TO_EXCEPTION_THROWN_FS: String
@@ -226,6 +227,8 @@ object Locale {
       "Locale installed!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "List of supported commands"
+    override val LIST_SUPPORTED_LANGUAGES: String =
+      "List supported languages."
     override val MESSAGE_SENT: String =
       "Message sent."
     override val NEXT_TAG_FS: String =
@@ -442,6 +445,8 @@ object Locale {
       "Язык установлен!"
     override val LIST_OF_SUPPORTED_COMMANDS_FS: String =
       "Список поддерживаемых команд"
+    override val LIST_SUPPORTED_LANGUAGES: String =
+      "Вывести список поддерживаемых языков."
     override val MESSAGE_SENT: String =
       "Сообщение отправлено."
     override val NEXT_TAG_FS: String =

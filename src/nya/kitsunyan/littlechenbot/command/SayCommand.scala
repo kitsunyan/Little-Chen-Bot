@@ -28,11 +28,26 @@ trait SayCommand extends Command {
         replyMan(locale.TEXT_TO_SPEECH,
           (List("-l", "--language"), Some("string"),
             locale.SET_TARGET_LANGUAGE) ::
+          (List("--list"), None,
+            locale.LIST_SUPPORTED_LANGUAGES) ::
           (List("-h", "--help"), None,
             locale.DISPLAY_THIS_HELP) ::
           Nil)
       }.statusMap(Status.Success)
         .recoverWith(handleError(None)(message))
+    } else if (arguments("list").nonEmpty) {
+      checkArguments(arguments, 0, "list")
+        .unitFlatMap(TranslateService.languages)
+        .flatMap { languages =>
+          val text = languages
+            .filter(language => language.source && language.tts)
+            .map(language => s"${language.code} — ${language.name}")
+            .reduce(_ + "\n" + _)
+
+          replyQuote(s"```\n$text\n```", Some(ParseMode.Markdown))
+        }
+        .statusMap(Status.Success)
+        .recoverWith(handleError(Some(locale.TRANSLATION_REQUEST_FV_FS))(message))
     } else {
       val language = arguments("l", "language").asString.getOrElse("en")
       val list = arguments.free.flatMap(_.asString.filter(_.trim.nonEmpty))
