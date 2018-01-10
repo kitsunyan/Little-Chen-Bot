@@ -13,35 +13,37 @@ import scala.annotation.tailrec
 import scala.concurrent._
 
 object TranslateService {
+  private case class ModuleScript(body: String, tkName: String)
+
   private val actor = ActorSystem("TranslateService").actorOf(Props(new TranslateActor))
   private implicit val timeout: Timeout = Timeout(1, TimeUnit.DAYS)
 
-  private case class ObtainCalculationScript(http: Http, executionContext: ExecutionContext)
-  private case class UpdateCalculationScript(calculationScript: String)
+  private case class ObtainModuleScript(http: Http, executionContext: ExecutionContext)
+  private case class UpdateModuleScript(moduleScript: ModuleScript)
 
   private class TranslateActor extends Actor {
     private val lifetime = 60 * 60 * 1000L
 
-    private var lastCalculationUpdate = 0L
-    private var lastCalculationScript = ""
+    private var lastModuleScriptUpdate = 0L
+    private var lastModuleScript = ModuleScript("", "")
 
     def receive: Receive = {
-      case ObtainCalculationScript(http, executionContext) =>
+      case ObtainModuleScript(http, executionContext) =>
         implicit val httpImplicit: Http = http
         implicit val executionContextImplicit: ExecutionContext = executionContext
 
         val time = System.currentTimeMillis
-        if (time > lastCalculationUpdate + lifetime) {
-          sender ! obtainCalculationScript.map { calculationScript =>
-            self ! UpdateCalculationScript(calculationScript)
-            calculationScript
+        if (time > lastModuleScriptUpdate + lifetime) {
+          sender ! obtainModuleScript.map { moduleScript =>
+            self ! UpdateModuleScript(moduleScript)
+            moduleScript
           }
         } else {
-          sender ! Future.successful(lastCalculationScript)
+          sender ! Future.successful(lastModuleScript)
         }
-      case UpdateCalculationScript(calculationScript) =>
-        lastCalculationUpdate = System.currentTimeMillis
-        lastCalculationScript = calculationScript
+      case UpdateModuleScript(moduleScript) =>
+        lastModuleScriptUpdate = System.currentTimeMillis
+        lastModuleScript = moduleScript
     }
   }
 
@@ -55,7 +57,7 @@ object TranslateService {
 
   class UnsupportedLanguageException extends TranslateException("Unsupported language")
 
-  private def obtainCalculationScript(implicit http: Http, executionContext: ExecutionContext): Future[String] = {
+  private def obtainModuleScript(implicit http: Http, executionContext: ExecutionContext): Future[ModuleScript] = {
     http.http(origin).runString(Http.Filters.ok).flatMap { response =>
       @tailrec def findTkkEvalEnd(eval: String, fromIndex: Int): Option[Int] = {
         val index = eval.indexOf("')", fromIndex)
@@ -94,7 +96,7 @@ object TranslateService {
           "String.fromCharCode(116)" ::
           Nil
 
-        val functionName = (for {
+        val tkName = (for {
           occurrenceIndex <- possibleOccurrences.foldLeft[Option[Int]](None) { (a, v) =>
             a orElse {
               val index = response.body.indexOf(v)
@@ -108,14 +110,13 @@ object TranslateService {
         } yield name).getOrElse(throw new RuntimeException)
 
         val fixScript =
-          """
-            |window = this
+          """window = this
             |navigator = {}
             |document = {createElement: function() {return {}}}
             |window.jstiming = {load: {tick: function() {}}}
           """.stripMargin
 
-        s"$fixScript\nthis.$tkkEvalScript\n${response.body}\nconsole.log($functionName(process.argv[2]))"
+        ModuleScript(s"${fixScript}this.$tkkEvalScript\n${response.body}", tkName)
       })) match {
         case Right(future) => future
         case Left(error) => Future.failed(error)
@@ -123,23 +124,16 @@ object TranslateService {
     }
   }
 
+  private def moduleScript(implicit http: Http, executionContext: ExecutionContext): Future[ModuleScript] = {
+    (actor ? ObtainModuleScript(http, executionContext))
+      .mapTo[Future[ModuleScript]].flatten
+  }
+
   private def tkArgument(input: String)(implicit binaries: Binaries,
     http: Http, executionContext: ExecutionContext): Future[String] = {
-    (actor ? ObtainCalculationScript(http, executionContext))
-      .mapTo[Future[String]].flatten.map { calculationScript =>
-      val file = java.io.File.createTempFile("littlechenbot", ".js")
-      try {
-        val output = new java.io.FileOutputStream(file)
-        try {
-          output.write(calculationScript.getBytes("UTF-8"))
-        } finally {
-          output.close()
-        }
-
-        new String(Utils.exec(None, Seq(binaries.node, file.getAbsolutePath, input)), "UTF-8")
-      } finally {
-        file.delete()
-      }
+    moduleScript.map { moduleScript =>
+      val body = s"${moduleScript.body}\nconsole.log(${moduleScript.tkName}(process.argv[2]))"
+      new String(Utils.exec(Some(body.getBytes("UTF-8")), Seq(binaries.node, "", input)), "UTF-8")
     }
   }
 
