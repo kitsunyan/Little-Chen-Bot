@@ -1,30 +1,52 @@
 package nya.kitsunyan.littlechenbot.util
 
 object Utils {
-  def exec(data: Option[Array[Byte]], commands: Seq[String]): Array[Byte] = {
+  def execWithCode(data: Option[Array[Byte]], commands: Seq[String]): (Int, Array[Byte]) = {
     val process = Runtime.getRuntime.exec(commands.toArray)
     try {
-      val outputStream = process.getOutputStream
-      data.foreach(outputStream.write)
-      outputStream.close()
+      data.foreach { data =>
+        new Thread(() => {
+          try {
+            val outputStream = process.getOutputStream
+            outputStream.write(data)
+            outputStream.close()
+          } catch {
+            case _: Exception =>
+          }
+        }).start()
+      }
+
       val result = io.Source.fromInputStream(process.getInputStream)(io.Codec.ISO8859).map(_.toByte).toArray
       val exitValue = process.waitFor()
-      if (exitValue != 0) {
-        throw new Exception(s"Exit value is $exitValue.")
-      }
-      result
+      (exitValue, result)
     } finally {
       process.destroy()
     }
   }
 
-  def webpToPng(data: Array[Byte])(implicit binaries: Binaries): Option[Array[Byte]] = {
-    try {
-      Some(exec(Some(data), List(binaries.dwebp, "-o", "-", "--", "-")))
-    } catch {
-      case e: Exception =>
-        e.printStackTrace()
-        None
+  def exec(data: Option[Array[Byte]], commands: Seq[String]): Array[Byte] = {
+    val (exitValue, result) = execWithCode(data, commands)
+    if (exitValue != 0) {
+      throw new Exception(s"Exit value is $exitValue.")
+    }
+    result
+  }
+
+  def webpToPng(data: Array[Byte])(implicit binaries: Binaries): Array[Byte] = {
+    exec(Some(data), List(binaries.dwebp, "-o", "-", "--", "-"))
+  }
+
+  def extractPreviewPng(data: Array[Byte], inputFormat: String)(implicit binaries: Binaries): Array[Byte] = {
+    val (exitValue, result) = execWithCode(Some(data), Seq(binaries.ffmpeg, "-f", inputFormat, "-i", "-",
+      "-vframes", "1", "-f", "image2pipe", "-vcodec", "png", "-"))
+
+    val magic = Seq(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a).map(_.toByte)
+    if (result.take(8).toSeq == magic) {
+      result
+    } else if (exitValue != 0) {
+      throw new Exception(s"Exit value is $exitValue.")
+    } else {
+      throw new Exception("Invalid PNG result.")
     }
   }
 
