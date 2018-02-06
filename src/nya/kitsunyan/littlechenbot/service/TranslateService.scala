@@ -227,10 +227,10 @@ object TranslateService {
         .flatMap(option => source(select.subgroups(0)).map((option.subgroups(0), _, option.subgroups(1))))))
       .flatMap(list => moduleScript
         .map(_.body)
-        .map("Lv=\\{(.*?)\\}".r.findFirstMatchIn)
+        .map("\\{([^}]*?en:1[^}]*?)\\}".r.findFirstMatchIn)
         .map(_.flatMap(_.subgroups.headOption)
           .map("\"?([a-z-]+)\"?:(\\d+)".r.findAllMatchIn)
-          .map(_.flatMap(lv => if (lv.subgroups(1).toInt != 0) Some(lv.subgroups(0)) else None))
+          .map(_.flatMap(tts => if (tts.subgroups(1).toInt != 0) Some(tts.subgroups(0)) else None))
           .getOrElse(Nil))
         .map { translatable =>
           val set = translatable.toSet
