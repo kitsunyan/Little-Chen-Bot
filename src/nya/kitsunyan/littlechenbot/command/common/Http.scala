@@ -210,8 +210,8 @@ object Http {
     new ExtendedFilter(filter)
   }
 
-  class HttpException(override val userMessage: Option[String], message: String) extends Exception(message)
-    with UserMessageException
+  class HttpException(override val userMessage: Option[String], message: String, val code: Option[Int])
+    extends Exception(message) with UserMessageException
 
   object Filters {
     def any: Filter = Filter((_, _, _) => ())
@@ -232,19 +232,21 @@ object Http {
           .headOption
           .map(_.toLong)
           .find(_ > maxContentLength)
-          .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]"))
-      }, Some(maxContentLength, (url, privateUrl) => throwWithPrivateUrl(url, privateUrl, s"Response is too large")))
+          .foreach(l => throwWithPrivateUrl(url, privateUrl, s"Response is too large: [$l]", None))
+      }, Some(maxContentLength, (url, privateUrl) =>
+        throwWithPrivateUrl(url, privateUrl, s"Response is too large", None)))
     }
   }
 
-  private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String): Nothing = {
+  private def throwWithPrivateUrl(url: String, privateUrl: Boolean, commonMessage: String,
+    code: Option[Int]): Nothing = {
     val publicMessage = s"$commonMessage."
     val privateMessage = s"$commonMessage $url."
-    throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage)
+    throw new HttpException(Some(if (privateUrl) publicMessage else privateMessage), privateMessage, code)
   }
 
-  def throwResponseCodeExceptionWithPrivateUrl(url: String, privateUrl: Boolean, responseCode: Int): Nothing = {
-    throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$responseCode]")
+  def throwResponseCodeExceptionWithPrivateUrl(url: String, privateUrl: Boolean, code: Int): Nothing = {
+    throwWithPrivateUrl(url, privateUrl, s"Invalid response: [$code]", Some(code))
   }
 
   case class MultipartFile(name: String, filename: String, mimeType: String, data: Array[Byte])

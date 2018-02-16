@@ -101,6 +101,9 @@ trait PixivCommand extends Command with ExtractImage {
             s"https://i.pximg.net/c/150x150/img-master/img/${result.part}/${pixivId}_p${result.index}${result.suffix}.",
             response.pageUrl)
         }
+      }.recover {
+        case e: Http.HttpException if e.code.contains(403) || e.code.contains(404) =>
+          Nil
       }
     }
 
