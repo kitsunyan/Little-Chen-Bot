@@ -15,7 +15,7 @@ trait SayCommand extends Command {
   private val commands = List("say")
 
   override def prependDescription(list: List[Description], locale: Locale): List[Description] = {
-    super.prependDescription(Description(commands, locale.BAKA_FD) :: list, locale)
+    super.prependDescription(Description(commands, locale.TEXT_TO_SPEECH_FD) :: list, locale)
   }
 
   override def handleMessage(message: ExtendedMessage, filterChat: FilterChat): Future[Status] = {
