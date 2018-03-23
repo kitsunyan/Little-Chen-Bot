@@ -7,6 +7,8 @@ import nya.kitsunyan.littlechenbot.util._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
+import com.vdurmont.emoji.EmojiParser
+
 import scala.concurrent.Future
 
 trait SayCommand extends Command {
@@ -62,6 +64,7 @@ trait SayCommand extends Command {
             TranslateService.transliterate(text)
           }
         }
+        .map(EmojiParser.removeAllEmojis)
         .flatMap(TranslateService.textToSpeech(_, language))
         .flatMap(audio => request(SendVoice(message.chat.id,
           InputFile(s"${System.currentTimeMillis}.opus", audio),

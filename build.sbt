@@ -23,6 +23,7 @@ libraryDependencies ++=
   "org.xerial" % "sqlite-jdbc" % "3.20.0" ::
   "com.typesafe.slick" %% "slick" % "3.2.1" ::
   "com.squareup.okhttp3" % "okhttp" % "3.9.0" ::
+  "com.vdurmont" % "emoji-java" % "4.0.0" ::
   Nil
 
 lazy val config = {

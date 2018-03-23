@@ -7,6 +7,8 @@ import nya.kitsunyan.littlechenbot.util._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
+import com.vdurmont.emoji.EmojiParser
+
 import scala.concurrent.Future
 
 trait BakaCommand extends Command {
@@ -45,6 +47,7 @@ trait BakaCommand extends Command {
           .map(TranslateService.transliterate)
           .map(_.map(name => s"$name baka"))
           .getOrElse(Future.successful("baka")))
+        .map(EmojiParser.removeAllEmojis)
         .flatMap(TranslateService.textToSpeech(_, "ja"))
         .flatMap(audio => request(SendVoice(targetMessage.chat.id,
           InputFile(s"${System.currentTimeMillis}.opus", audio),
