@@ -38,6 +38,8 @@ def config[T](getter: Config => String => T, key: String): Option[T] = {
   }
 }
 
+val mainClassName = "nya.kitsunyan.littlechenbot.BotApplication"
+
 proguardSettings
 
 javaOptions in (Proguard, com.typesafe.sbt.SbtProguard.ProguardKeys.proguard) := Seq("-Xmx2G")
@@ -82,7 +84,7 @@ val proguardClassesToKeep: List[String] =
   Nil
 
 ProguardKeys.options in Proguard ++=
-  ProguardOptions.keepMain("nya.kitsunyan.littlechenbot.BotApplication") ::
+  ProguardOptions.keepMain(mainClassName) ::
   proguardClassesToKeep.map("-keep class " + _ + " { *; }")
 
 ProguardKeys.merge in Proguard := true
@@ -109,4 +111,12 @@ ProguardKeys.mergeStrategies in Proguard ++= {
   } else {
     Nil
   }
+}
+
+mainClass in assembly := Some(mainClassName)
+assemblyJarName in assembly := "littlechenbot.jar"
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", _ @ _*) => MergeStrategy.discard
+  case "reference.conf" => MergeStrategy.concat
+  case _ => MergeStrategy.first
 }
