@@ -142,7 +142,7 @@ trait GuessCommand extends Command {
 
         booruImageOption.map { booruImage =>
           request(SendPhoto(message.source, InputFile(booruImage.name, booruImage.data),
-            replyToMessageId = Some(message.messageId), caption = Some(text)))
+            replyToMessageId = Some(message.messageId), caption = Some(trimCaption(text))))
         }.getOrElse {
           replyQuote(text)
         }.flatMap(_ => actor ? RemoveGame(key))

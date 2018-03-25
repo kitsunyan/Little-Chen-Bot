@@ -217,7 +217,7 @@ trait IqdbCommand extends Command with ExtractImage {
         .map(imageData.pageUrl + "\n" + _) orElse Some(imageData.pageUrl)
 
       request(SendDocument(message.source, InputFile(imageData.name, imageData.image),
-        replyToMessageId = Some(message.messageId), caption = captionOption))
+        replyToMessageId = Some(message.messageId), caption = captionOption.map(trimCaption)))
         .map((imageData, _))
     }
 

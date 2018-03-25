@@ -220,7 +220,7 @@ trait PixivCommand extends Command with ExtractImage {
 
     def replyWithImage(imageData: ImageData): Future[Message] = {
       request(SendDocument(message.source, InputFile(imageData.name, imageData.image),
-        replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
+        replyToMessageId = Some(message.messageId), caption = Some(trimCaption(imageData.url))))
     }
 
     if (arguments("h", "help").nonEmpty) {

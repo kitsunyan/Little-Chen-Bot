@@ -135,10 +135,10 @@ trait ReverseCommand extends Command with ExtractImage {
     def replyWithImage(asDocument: Boolean)(imageData: ImageData): Future[Message] = {
       if (asDocument) {
         request(SendDocument(message.source, InputFile(imageData.name, imageData.image),
-          replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
+          replyToMessageId = Some(message.messageId), caption = Some(trimCaption(imageData.url))))
       } else {
         request(SendPhoto(message.source, InputFile(imageData.name, imageData.image),
-          replyToMessageId = Some(message.messageId), caption = Some(imageData.url)))
+          replyToMessageId = Some(message.messageId), caption = Some(trimCaption(imageData.url))))
       }
     }
 
