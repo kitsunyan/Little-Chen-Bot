@@ -137,8 +137,8 @@ trait ReverseCommand extends Command with ExtractImage {
         request(SendDocument(message.source, InputFile(imageData.name, imageData.image),
           replyToMessageId = Some(message.messageId), caption = Some(trimCaption(imageData.url))))
       } else {
-        request(SendPhoto(message.source, InputFile(imageData.name, imageData.image),
-          replyToMessageId = Some(message.messageId), caption = Some(trimCaption(imageData.url))))
+        sendPhotoOrDocument(message.source, InputFile(imageData.name, imageData.image),
+          replyToMessageId = Some(message.messageId), caption = Some(trimCaption(imageData.url)))
       }
     }
 

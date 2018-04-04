@@ -2,6 +2,7 @@ package nya.kitsunyan.littlechenbot.command.common
 
 import nya.kitsunyan.littlechenbot.util._
 
+import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods._
 import info.mukel.telegrambot4s.models._
 
@@ -124,6 +125,16 @@ trait ExtractImage {
           case Right(url) =>
             readExternalFile(url, false).map(_.left.getOrElse(throw new Exception("Impossible value.")))
         }
+    }
+  }
+
+  def sendPhotoOrDocument(chatId: ChatId, photo: InputFile, caption: Option[String] = None,
+    replyToMessageId: Option[Long] = None): Future[Message] = {
+    request(SendPhoto(chatId, photo, caption, replyToMessageId = replyToMessageId.map(_.toInt))).recoverWith {
+      case e: TelegramApiException if e.message.contains("PHOTO_INVALID_DIMENSIONS") =>
+        request(SendDocument(chatId, photo, caption, replyToMessageId = replyToMessageId))
+      case e: Throwable =>
+        Future.failed(e)
     }
   }
 }

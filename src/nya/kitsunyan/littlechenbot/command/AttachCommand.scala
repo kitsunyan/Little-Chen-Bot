@@ -27,8 +27,8 @@ trait AttachCommand extends Command with ExtractImage {
         request(SendDocument(message.source, InputFile(typedFile.name, typedFile.data),
           replyToMessageId = Some(message.messageId)))
       } else {
-        request(SendPhoto(message.source, InputFile(typedFile.name, typedFile.data),
-          replyToMessageId = Some(message.messageId)))
+        sendPhotoOrDocument(message.source, InputFile(typedFile.name, typedFile.data),
+          replyToMessageId = Some(message.messageId))
       }
     }
 
