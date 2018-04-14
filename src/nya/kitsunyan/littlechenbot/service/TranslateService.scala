@@ -103,10 +103,12 @@ object TranslateService {
               if (index >= 0) Some(index) else None
             }
           }
-          matchData <- "(?:[;,)}\\s]+(\\w+)\\s*=\\s*)?function(?:\\s+(\\w+)(?: |\\())?".r
+          name <- "(?:[;,)}\\s]+([\\w\\$]+)\\s*=\\s*)?function(?:\\s+([\\w\\$]+)(?: |\\())?".r
             .findAllIn(response.body.substring(0, occurrenceIndex))
-            .matchData.map(_.subgroups).toList.lastOption
-          name <- Option(matchData(0)) orElse Option(matchData(1))
+            .matchData.map(_.subgroups).flatMap {
+            case nl :: nr :: Nil => Option(nl) orElse Option(nr)
+            case e => throw new MatchError(e)
+          }.toList.lastOption
         } yield name).getOrElse(throw new RuntimeException)
 
         val fixScript =
