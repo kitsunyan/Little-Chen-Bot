@@ -89,7 +89,21 @@ object BotApplication extends App {
             Some(true), causalMessage.messageId)).flatMap { sentMessage =>
             val writer = new java.io.StringWriter
             e.printStackTrace(new java.io.PrintWriter(writer))
-            request(SendMessage(botOwner, "```\n" + writer.toString + "\n```", Some(ParseMode.Markdown),
+            val stackTraceFull = writer.toString
+
+            val maxLength = 4000
+            val stackTrace = if (stackTraceFull.length > maxLength) {
+              val index = stackTraceFull.lastIndexOf('\n', maxLength)
+              if (index >= 0) {
+                stackTraceFull.substring(0, index)
+              } else {
+                stackTraceFull.substring(0, maxLength)
+              }
+            } else {
+              stackTraceFull
+            }
+
+            request(SendMessage(botOwner, "```\n" + stackTrace + "\n```", Some(ParseMode.Markdown),
               Some(true), Some(true), Some(sentMessage.messageId)))
           }.recover {
             case e => e.printStackTrace()
