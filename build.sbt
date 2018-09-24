@@ -4,7 +4,7 @@ name := "littlechenbot"
 
 version := "1.0"
 
-scalaVersion := "2.12.3"
+scalaVersion := "2.12.6"
 
 scalacOptions :=
   "-unchecked" ::
@@ -17,12 +17,11 @@ scalaSource in Compile := baseDirectory.value / "src"
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies ++=
-  "info.mukel" %% "telegrambot4s" % "3.0.14" ::
+  "info.mukel" %% "telegrambot4s" % "3.0.15" ::
   "org.slf4j" % "slf4j-simple" % "1.7.25" ::
-  "org.json4s" %% "json4s-jackson" % "3.5.3" ::
-  "org.xerial" % "sqlite-jdbc" % "3.20.0" ::
-  "com.typesafe.slick" %% "slick" % "3.2.1" ::
-  "com.squareup.okhttp3" % "okhttp" % "3.9.0" ::
+  "org.xerial" % "sqlite-jdbc" % "3.23.1" ::
+  "com.typesafe.slick" %% "slick" % "3.2.3" ::
+  "com.squareup.okhttp3" % "okhttp" % "3.11.0" ::
   "com.vdurmont" % "emoji-java" % "4.0.0" ::
   Nil
 
@@ -41,13 +40,13 @@ def config[T](getter: Config => String => T, key: String): Option[T] = {
 
 val mainClassName = "nya.kitsunyan.littlechenbot.BotApplication"
 
-proguardSettings
+enablePlugins(com.lightbend.sbt.SbtProguard)
 
-javaOptions in (Proguard, com.typesafe.sbt.SbtProguard.ProguardKeys.proguard) := Seq("-Xmx2G")
+javaOptions in (Proguard, com.lightbend.sbt.SbtProguard.autoImport.proguard) := Seq("-Xmx4G")
 
-ProguardKeys.proguardVersion in Proguard := "5.3.2"
+proguardVersion in Proguard := "5.3.2"
 
-ProguardKeys.options in Proguard ++=
+proguardOptions in Proguard ++=
   "-dontoptimize" ::
   "-dontobfuscate" ::
   "-dontnote" ::
@@ -84,15 +83,15 @@ val proguardClassesToKeep: List[String] =
   "scala.reflect.ScalaSignature" ::
   Nil
 
-ProguardKeys.options in Proguard ++=
+proguardOptions in Proguard ++=
   ProguardOptions.keepMain(mainClassName) ::
   proguardClassesToKeep.map("-keep class " + _ + " { *; }")
 
-ProguardKeys.merge in Proguard := true
+proguardMerge in Proguard := true
 
-ProguardKeys.mergeStrategies in Proguard += ProguardMerge.discard("META-INF/.*".r)
+proguardMergeStrategies in Proguard += ProguardMerge.discard("META-INF/.*".r)
 
-ProguardKeys.mergeStrategies in Proguard += ProguardMerge.append("reference.conf")
+proguardMergeStrategies in Proguard += ProguardMerge.append("reference.conf")
 
 def solibFilter: List[(String, String)] = {
   import scala.collection.JavaConverters._
@@ -104,7 +103,7 @@ def solibFilter: List[(String, String)] = {
   } yield (os, arch)
 }
 
-ProguardKeys.mergeStrategies in Proguard ++= {
+proguardMergeStrategies in Proguard ++= {
   val list = solibFilter.map { case (os, arch) => s"$os/$arch/" }
   if (list.nonEmpty) {
     val regex = list.reduce(_ + "|" + _)
