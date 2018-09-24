@@ -59,36 +59,41 @@ object TranslateService {
 
   private def obtainModuleScript(implicit http: Http, executionContext: ExecutionContext): Future[ModuleScript] = {
     http.http(origin).runString(Http.Filters.ok).flatMap { response =>
-      @tailrec def findTkkEvalEnd(eval: String, fromIndex: Int): Option[Int] = {
-        val index = eval.indexOf("')", fromIndex)
+      @tailrec def findAssignEnd(text: String, end: String, fromIndex: Int): Option[Int] = {
+        val index = text.indexOf(end, fromIndex)
         if (index > 0) {
-          if (eval(index - 1) != '\\') {
-            Some(index + 2)
+          if (text(index - 1) != '\\') {
+            Some(index + end.length)
           } else {
-            findTkkEvalEnd(eval, index + 1)
+            findAssignEnd(text, end, index + 1)
           }
         } else {
           None
         }
       }
 
-      val tkkEvalIndex = response.body.indexOf("TKK=eval('") match {
-        case i if i <= -1 => Left(new TranslateException("TKK is not found"))
-        case i => Right(i)
+      def findAssignEndEither(text: String, end: String,
+        startIndex: Int, fromIndex: Int): Either[TranslateException, String] = {
+        findAssignEnd(text, end, fromIndex)
+          .map(text.substring(startIndex, _))
+          .map(Right.apply)
+          .getOrElse(Left(new TranslateException("Can not parse TKK")))
       }
 
-      val tkkEvalScript = tkkEvalIndex
-        .flatMap(tkkEvalIndex => findTkkEvalEnd(response.body, tkkEvalIndex)
-          .map(response.body.substring(tkkEvalIndex, _))
-          .map(Right.apply)
-          .getOrElse(Left(new TranslateException("Can not parse TKK"))))
+      val tkkAssignScript = response.body.indexOf("TKK=eval('") match {
+        case i if i >= 0 => findAssignEndEither(response.body, "')", i, i + 10)
+        case _ => response.body.indexOf("TKK='") match {
+          case i if i >= 0 => findAssignEndEither(response.body, "'", i, i + 5)
+          case _ => Left(new TranslateException("TKK is not found"))
+        }
+      }
 
       val desktopScriptUrl = "(?<=\")[^\"]*/desktop_module_main.js(?=\")".r
         .findFirstIn(response.body).map(Utils.appendSchemeHost(https, host))
         .map(Right.apply)
         .getOrElse(Left(new TranslateException("Can not find JS module path")))
 
-      tkkEvalScript.flatMap(tkkEvalScript => desktopScriptUrl
+      tkkAssignScript.flatMap(tkkAssignScript => desktopScriptUrl
         .map(desktopScriptUrl => http.http(desktopScriptUrl).runString(Http.Filters.ok).map { response =>
         val possibleOccurrences =
           "String.fromCharCode(84)" ::
@@ -118,7 +123,7 @@ object TranslateService {
             |window.jstiming = {load: {tick: function() {}}}
           """.stripMargin
 
-        ModuleScript(s"${fixScript}this.$tkkEvalScript\n${response.body}", tkName)
+        ModuleScript(s"${fixScript}this.$tkkAssignScript\n${response.body}", tkName)
       })) match {
         case Right(future) => future
         case Left(error) => Future.failed(error)
