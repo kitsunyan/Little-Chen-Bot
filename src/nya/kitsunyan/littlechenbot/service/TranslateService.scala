@@ -84,12 +84,17 @@ object TranslateService {
         case i if i >= 0 => findAssignEndEither(response.body, "')", i, i + 10)
         case _ => response.body.indexOf("TKK='") match {
           case i if i >= 0 => findAssignEndEither(response.body, "'", i, i + 5)
-          case _ => Left(new TranslateException("TKK is not found"))
+          case _ => response.body.indexOf("tkk:'") match {
+            case i if i >= 0 => findAssignEndEither(response.body, "'", i, i + 5).map(x => x.replace("tkk:", "TKK="))
+            case _ => Left(new TranslateException("TKK is not found"))
+          }
         }
       }
 
       val desktopScriptUrl = "(?<=\")[^\"]*/desktop_module_main.js(?=\")".r
         .findFirstIn(response.body).map(Utils.appendSchemeHost(https, host))
+        .orElse("(?<=\")[^\"]*/js/translate_m(?:_\\w+)?.js(?=\")".r
+          .findFirstIn(response.body).map(Utils.appendSchemeHost(https, host)))
         .map(Right.apply)
         .getOrElse(Left(new TranslateException("Can not find JS module path")))
 
@@ -119,8 +124,10 @@ object TranslateService {
         val fixScript =
           """window = this
             |navigator = {}
+            |DATA = {}
             |document = {createElement: function() {return {}}}
             |window.jstiming = {load: {tick: function() {}}}
+            |window.addEventListener = function() {}
           """.stripMargin
 
         ModuleScript(s"${fixScript}this.$tkkAssignScript\n${response.body}", tkName)
